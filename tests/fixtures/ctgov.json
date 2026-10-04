@@ -1,0 +1,901 @@
+{
+ "studies": [
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT07854847",
+     "orgStudyIdInfo": {
+      "id": "HepB0226"
+     },
+     "organization": {
+      "fullName": "PT Bio Farma",
+      "class": "INDUSTRY"
+     },
+     "briefTitle": "Study Interchangeability Hep-B Vaccine Administered at Birth Dose",
+     "officialTitle": "Randomized, Double-Blind, Interchangeability Study of In-House Recombinant Hepatitis B (Bio Farma) at Birth Dose Followed by RRegistered DTwP-HepB-IPV-Hib (HEXASIIL) Vaccine in Indonesian Infants"
+    },
+    "statusModule": {
+     "statusVerifiedDate": "2026-09",
+     "overallStatus": "NOT_YET_RECRUITING",
+     "expandedAccessInfo": {
+      "hasExpandedAccess": false
+     },
+     "startDateStruct": {
+      "date": "2026-10",
+      "type": "ESTIMATED"
+     },
+     "primaryCompletionDateStruct": {
+      "date": "2027-02",
+      "type": "ESTIMATED"
+     },
+     "completionDateStruct": {
+      "date": "2027-07",
+      "type": "ESTIMATED"
+     },
+     "studyFirstSubmitDate": "2026-09-28",
+     "studyFirstSubmitQcDate": "2026-09-28",
+     "studyFirstPostDateStruct": {
+      "date": "2026-10-02",
+      "type": "ACTUAL"
+     },
+     "lastUpdateSubmitDate": "2026-09-28",
+     "lastUpdatePostDateStruct": {
+      "date": "2026-10-02",
+      "type": "ACTUAL"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "responsibleParty": {
+      "type": "SPONSOR"
+     },
+     "leadSponsor": {
+      "name": "PT Bio Farma",
+      "class": "INDUSTRY"
+     },
+     "collaborators": [
+      {
+       "name": "Faculty of Medicine Universitas Padjadjaran",
+       "class": "UNKNOWN"
+      }
+     ]
+    },
+    "oversightModule": {
+     "oversightHasDmc": true,
+     "isFdaRegulatedDrug": false,
+     "isFdaRegulatedDevice": false
+    },
+    "descriptionModule": {
+     "briefSummary": "This trial is a randomized, double-blind, two arms parallel groups, prospective intervention study.",
+     "detailedDescription": "This trial is a randomized, double-blind, two arms parallel groups, prospective intervention study.\n\nApproximately 270 newborns will be enrolled in this trial, divided into 2 arms, with the ratio 1:1. The subject will receive one dose of In-House Recombinant Hepatitis B at birth or registered monovalent Hepatitis B as a control then followed by registered DTwP-HepB-IPVHib (HEXASIIL) vaccine"
+    },
+    "conditionsModule": {
+     "conditions": [
+      "Vaccination Adverse Event",
+      "Immunogenicity, Vaccine"
+     ],
+     "keywords": [
+      "Vaccine",
+      "Hepatitis B"
+     ]
+    },
+    "designModule": {
+     "studyType": "INTERVENTIONAL",
+     "phases": [
+      "PHASE3"
+     ],
+     "designInfo": {
+      "allocation": "RANDOMIZED",
+      "interventionModel": "PARALLEL",
+      "interventionModelDescription": "Randomized, double-blind, two arms parallel groups, prospective intervention study.",
+      "primaryPurpose": "PREVENTION",
+      "maskingInfo": {
+       "masking": "DOUBLE",
+       "maskingDescription": "Inclusion number will be allocated in the chronological order of the subject inclusion in the trial. The subject will be randomized by treatment group. The randomization list will be provided by unblinded personnel of the study team. The unblinded team will keep the list until Sponsor formally issues the result of the study.",
+       "whoMasked": [
+        "PARTICIPANT",
+        "INVESTIGATOR"
+       ]
+      }
+     },
+     "enrollmentInfo": {
+      "count": 270,
+      "type": "ESTIMATED"
+     }
+    },
+    "armsInterventionsModule": {
+     "armGroups": [
+      {
+       "label": "Hep B vaccine in-house",
+       "type": "EXPERIMENTAL",
+       "description": "0,5 ml of In-house Recombinant Hepatitis B (Bio Farma) vaccine injected at birth",
+       "interventionNames": [
+        "Biological: In-house Hepatitis B Vaccine"
+       ]
+      },
+      {
+       "label": "Registered Hep B vaccine",
+       "type": "ACTIVE_COMPARATOR",
+       "description": "0,5 ml of Regstered Hepatitis B (Bio Farma) vaccine injected at birth",
+       "interventionNames": [
+        "Biological: Registered Hepatitis B Vaccine"
+       ]
+      }
+     ],
+     "interventions": [
+      {
+       "type": "BIOLOGICAL",
+       "name": "In-house Hepatitis B Vaccine",
+       "description": "0,5 ml In-House Recombinant Hepatitis B (Bio Farma) vaccine injected approximately at birth. The vaccines will be injected intramuscularly into the right anterolateral thigh",
+       "armGroupLabels": [
+        "Hep B vaccine in-house"
+       ]
+      },
+      {
+       "type": "BIOLOGICAL",
+       "name": "Registered Hepatitis B Vaccine",
+       "description": "0,5 ml Registered Recombinant Hepatitis B (Bio Farma) vaccine injected approximately at birth. The vaccines will be injected intramuscularly into the right anterolateral thigh",
+       "armGroupLabels": [
+        "Registered Hep B vaccine"
+       ]
+      }
+     ]
+    },
+    "outcomesModule": {
+     "primaryOutcomes": [
+      {
+       "measure": "Protectivity of primary series In-House Recombinant Hepatitis B vaccine",
+       "description": "Percentage of subjects with anti HBsAg \\> 10mIU/ml after the completion of the primary series of recombinant hepatitis B and Registered DTwP-HepB-IPV-Hib (HEXASIIL) vaccine for each group",
+       "timeFrame": "28 days after administration of third dose of DTwP-HepB-IPV-Hib (HEXASIIL) vaccine"
+      }
+     ],
+     "secondaryOutcomes": [
+      {
+       "measure": "Immunogenicity of birth dose In-House Recombinant Hepatitis B vaccine",
+       "description": "GMT and percentage of infants with increasing antibody titer ≥ 4 times and/ or percentage of infants with transition of seronegative to seropositive after birth dose Hep B vaccine",
+       "timeFrame": "28 days after administration of Hep B birth dose vaccine"
+      },
+      {
+       "measure": "Immunogenicity of In-House recombinant Hepatitis B vaccine after the completion of Registered DTwP-HepB-IPV-Hib (HEXASIIL) vaccine",
+       "description": "GMT and percentage of infants with increasing antibody titer ≥ 4 times and/ or percentage of infants with transition of seronegative to seropositive after completion of Registered DTwP-HepB-IPV-Hib (HEXASIIL) vaccine",
+       "timeFrame": "28 days after the third dose of DTwP-HepB-IPV-Hib (HEXASIIL) vaccine"
+      },
+      {
+       "measure": "Safety of In-House Recombinant Hepatitis B vaccine",
+       "description": "Percentage of subjects with solicited and unsolicited adverse events after each dose",
+       "timeFrame": "30 minutes, 7 days, 28 days after each dose"
+      },
+      {
+       "measure": "Serious Adverse Events",
+       "description": "Percentage of infants with at least one serious adverse events",
+       "timeFrame": "28 days after third dose of Registered DTwP-HepB-IPV-Hib (HEXASIIL) vaccine administration"
+      }
+     ]
+    },
+    "eligibilityModule": {
+     "eligibilityCriteria": "Inclusion Criteria:\n\n1. Healthy, full term, newborn infants.\n2. Infant born between 37-42 weeks of pregnancy.\n3. Infant weigh between 2500 - 4000 gram at birth.\n4. Father, mother or legally acceptable representative properly informed about the study and having signed the informed consent form.\n5. Parents will commit themselves to comply with the indications of the investigator and with the schedule of the trial.\n\nExclusion Criteria:\n\n1. Infants concomitantly enrolled or scheduled to be enrolled in another trial.\n2. Infants evolving moderate or severe illness, especially infectious diseases or fever (axillary temperature ≥ 37.5°C on Day 0).\n3. Infants suspected of uncontrolled coagulopathy or blood disorders contraindicating intramuscular injection, based on anamnesis.\n4. Infants received or plans to receive any treatment likely to alter the immune response intravenously (immunoglobulins, blood-derived products or long term corticotherapy (\\> 2 weeks)).\n5. Infants received other vaccinations with the exception of BCG, poliomyelitis, rotavirus, and PCV.\n6. Infants with HbsAg and HIV positive (from cord blood)\n7. Mother suspected of immunodeficiency disease based on anamnesis",
+     "healthyVolunteers": true,
+     "sex": "ALL",
+     "minimumAge": "0 Days",
+     "maximumAge": "3 Days",
+     "stdAges": [
+      "CHILD"
+     ]
+    },
+    "contactsLocationsModule": {
+     "centralContacts": [
+      {
+       "name": "Rini Mulia Sari, MD",
+       "role": "CONTACT",
+       "phone": "+622033755",
+       "phoneExt": "14102",
+       "email": "rini.mulia@biofarma.co.id"
+      },
+      {
+       "name": "Mita Puspita, MD",
+       "role": "CONTACT",
+       "phone": "+622033755",
+       "phoneExt": "5045",
+       "email": "mita.puspita@biofarma.co.id"
+      }
+     ],
+     "overallOfficials": [
+      {
+       "name": "Rodman Tarigan Girsang, MD",
+       "affiliation": "Faculty of Medicine, Padjadjaran University, Bandung",
+       "role": "PRINCIPAL_INVESTIGATOR"
+      }
+     ]
+    },
+    "ipdSharingStatementModule": {
+     "ipdSharing": "NO"
+    }
+   },
+   "derivedSection": {
+    "miscInfoModule": {
+     "versionHolder": "2026-10-02"
+    },
+    "conditionBrowseModule": {
+     "meshes": [
+      {
+       "id": "D006509",
+       "term": "Hepatitis B"
+      }
+     ],
+     "ancestors": [
+      {
+       "id": "D000086982",
+       "term": "Blood-Borne Infections"
+      },
+      {
+       "id": "D003141",
+       "term": "Communicable Diseases"
+      },
+      {
+       "id": "D007239",
+       "term": "Infections"
+      },
+      {
+       "id": "D018347",
+       "term": "Hepadnaviridae Infections"
+      },
+      {
+       "id": "D004266",
+       "term": "DNA Virus Infections"
+      },
+      {
+       "id": "D014777",
+       "term": "Virus Diseases"
+      },
+      {
+       "id": "D006525",
+       "term": "Hepatitis, Viral, Human"
+      },
+      {
+       "id": "D006505",
+       "term": "Hepatitis"
+      },
+      {
+       "id": "D008107",
+       "term": "Liver Diseases"
+      },
+      {
+       "id": "D004066",
+       "term": "Digestive System Diseases"
+      }
+     ]
+    }
+   },
+   "hasResults": false
+  },
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT07845812",
+     "orgStudyIdInfo": {
+      "id": "HSC-MS-26-0522"
+     },
+     "organization": {
+      "fullName": "The University of Texas Health Science Center, Houston",
+      "class": "OTHER"
+     },
+     "briefTitle": "Short Versus Standard Amoxicillin for Pediatric Strep Throat",
+     "officialTitle": "Short vs Standard Amoxicillin for Pediatric Strep Throat: A Patient-Centered Pragmatic Trial"
+    },
+    "statusModule": {
+     "statusVerifiedDate": "2026-09",
+     "overallStatus": "NOT_YET_RECRUITING",
+     "expandedAccessInfo": {
+      "hasExpandedAccess": false
+     },
+     "startDateStruct": {
+      "date": "2026-09-28",
+      "type": "ESTIMATED"
+     },
+     "primaryCompletionDateStruct": {
+      "date": "2029-04-28",
+      "type": "ESTIMATED"
+     },
+     "completionDateStruct": {
+      "date": "2029-09-28",
+      "type": "ESTIMATED"
+     },
+     "studyFirstSubmitDate": "2026-09-21",
+     "studyFirstSubmitQcDate": "2026-09-21",
+     "studyFirstPostDateStruct": {
+      "date": "2026-09-29",
+      "type": "ACTUAL"
+     },
+     "lastUpdateSubmitDate": "2026-09-21",
+     "lastUpdatePostDateStruct": {
+      "date": "2026-09-29",
+      "type": "ACTUAL"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "responsibleParty": {
+      "type": "PRINCIPAL_INVESTIGATOR",
+      "investigatorFullName": "Guliz Erdem",
+      "investigatorTitle": "Professor",
+      "investigatorAffiliation": "The University of Texas Health Science Center, Houston"
+     },
+     "leadSponsor": {
+      "name": "The University of Texas Health Science Center, Houston",
+      "class": "OTHER"
+     }
+    },
+    "oversightModule": {
+     "isFdaRegulatedDrug": true,
+     "isFdaRegulatedDevice": false,
+     "isUsExport": false
+    },
+    "descriptionModule": {
+     "briefSummary": "The purpose of this study is to compare 5-day vs 10-day amoxicillin for strep throat in children."
+    },
+    "conditionsModule": {
+     "conditions": [
+      "Group A Streptococcal (GAS) Pharyngitis"
+     ],
+     "keywords": [
+      "antibiotics"
+     ]
+    },
+    "designModule": {
+     "studyType": "INTERVENTIONAL",
+     "phases": [
+      "PHASE4"
+     ],
+     "designInfo": {
+      "allocation": "RANDOMIZED",
+      "interventionModel": "PARALLEL",
+      "primaryPurpose": "TREATMENT",
+      "maskingInfo": {
+       "masking": "NONE"
+      }
+     },
+     "enrollmentInfo": {
+      "count": 1500,
+      "type": "ESTIMATED"
+     }
+    },
+    "armsInterventionsModule": {
+     "armGroups": [
+      {
+       "label": "5 day short course antibiotic treatment",
+       "type": "EXPERIMENTAL",
+       "interventionNames": [
+        "Drug: 5 day short course antibiotic treatment"
+       ]
+      },
+      {
+       "label": "10 day standard of care antibiotic treatment",
+       "type": "ACTIVE_COMPARATOR",
+       "interventionNames": [
+        "Drug: 10 day standard of care antibiotic treatment"
+       ]
+      }
+     ],
+     "interventions": [
+      {
+       "type": "DRUG",
+       "name": "5 day short course antibiotic treatment",
+       "description": "Participants will receive oral penicillin or amoxicillin for 5 days",
+       "armGroupLabels": [
+        "5 day short course antibiotic treatment"
+       ]
+      },
+      {
+       "type": "DRUG",
+       "name": "10 day standard of care antibiotic treatment",
+       "description": "Participants will receive oral penicillin or amoxicillin for 10 days",
+       "armGroupLabels": [
+        "10 day standard of care antibiotic treatment"
+       ]
+      }
+     ]
+    },
+    "outcomesModule": {
+     "primaryOutcomes": [
+      {
+       "measure": "Number of participants that demonstrate resolution of throat pain and fever as reported by the participant/caregiver",
+       "timeFrame": "about 14 days after treatment initiation"
+      },
+      {
+       "measure": "Number of participants that do not require additional or alternative antibiotic therapy for Group A Streptococcal (GAS) pharyngitis",
+       "timeFrame": "about 14 days after treatment initiation"
+      }
+     ],
+     "secondaryOutcomes": [
+      {
+       "measure": "Number of participants that demonstrate improvement in pain",
+       "timeFrame": "From baseline to day 14"
+      },
+      {
+       "measure": "Number of participants that demonstrate improvement in fever",
+       "timeFrame": "From baseline to day 14"
+      },
+      {
+       "measure": "Number of participants that demonstrate improvement in treatment tolerance",
+       "timeFrame": "From baseline to day 14"
+      },
+      {
+       "measure": "Number of participants that complete the prescribed antibiotic course, assessed by caregiver report",
+       "timeFrame": "Day 14"
+      },
+      {
+       "measure": "Number of participants that have Antibiotic-Associated Adverse Effects",
+       "description": "Occurrence of non-serious, expected effects (e.g., gastrointestinal symptoms, rash), assessed by caregiver report and chart review",
+       "timeFrame": "From baseline to day 14"
+      },
+      {
+       "measure": "Number of participants that have recurrence of symptomatic GAS pharyngitis requiring additional medical evaluation or treatment.",
+       "timeFrame": "From the end of study treatment through Day 30"
+      },
+      {
+       "measure": "Number of participants with an emergency department visit, urgent care visit, or unplanned clinic encounter related to pharyngitis symptoms",
+       "timeFrame": "Within 30 days after completion of study treatment"
+      },
+      {
+       "measure": "Number of school days missed due to pharyngitis-related illness, as reported by the caregiver.",
+       "timeFrame": "Within 14 days after completion of study treatment"
+      },
+      {
+       "measure": "Number of caregiver workdays missed due to the child's illness",
+       "timeFrame": "Within 14 days after completion of study treatment"
+      }
+     ]
+    },
+    "eligibilityModule": {
+     "eligibilityCriteria": "Inclusion Criteria:\n\n* confirmed Group A streptococcal (GAS) pharyngitis, defined by a positive rapid antigen detection test\n* Receiving care at either the University of Texas Pediatrics General Clinic or the Memorial Hermann Emergency Department\n* Written informed consent obtained from a parent or legal guardian, with assent from the child when developmentally appropriate and required by institutional policy.\n\nExclusion Criteria:\n\n* Known allergy or hypersensitivity to penicillin, amoxicillin, or other beta-lactam antibiotics\n* Severe or complicated illness requiring hospitalization at presentation.\n* History of acute rheumatic fever, post-streptococcal glomerulonephritis, or other conditions for which prolonged antibiotic therapy is specifically indicated.\n* Immunocompromised state, including but not limited to: Active malignancy receiving chemotherapy, Solid-organ or hematopoietic stem cell transplant, Chronic systemic immunosuppressive therapy\n* Antibiotic use with activity against Group A Streptococcus within the preceding 7 days.\n* Inability to take oral medications or anticipated inability to complete outpatient therapy.",
+     "healthyVolunteers": false,
+     "sex": "ALL",
+     "minimumAge": "3 Years",
+     "maximumAge": "18 Years",
+     "stdAges": [
+      "CHILD",
+      "ADULT"
+     ]
+    },
+    "contactsLocationsModule": {
+     "centralContacts": [
+      {
+       "name": "Guliz Erdem, MD",
+       "role": "CONTACT",
+       "phone": "(713) 500-5806",
+       "email": "Guliz.Erdem@uth.tmc.edu"
+      },
+      {
+       "name": "Gabriela Del Bianco",
+       "role": "CONTACT",
+       "phone": "(713) 500-5806",
+       "email": "Gabriela.Del.Bianco@uth.tmc.edu"
+      }
+     ],
+     "overallOfficials": [
+      {
+       "name": "Guliz Erdem, MD",
+       "affiliation": "The University of Texas Health Science Center, Houston",
+       "role": "PRINCIPAL_INVESTIGATOR"
+      }
+     ],
+     "locations": [
+      {
+       "facility": "The University of Texas Health Science Center at Houston",
+       "city": "Houston",
+       "state": "Texas",
+       "zip": "77030",
+       "country": "United States",
+       "contacts": [
+        {
+         "name": "Guliz Erdem, MD",
+         "role": "CONTACT",
+         "phone": "713-500-5806",
+         "email": "Guliz.Erdem@uth.tmc.edu"
+        },
+        {
+         "name": "Gabriela Paula Del Bianco",
+         "role": "CONTACT",
+         "phone": "(713) 500-5806",
+         "email": "Gabriela.Del.Bianco@uth.tmc.edu"
+        }
+       ],
+       "geoPoint": {
+        "lat": 29.76328,
+        "lon": -95.36327
+       }
+      }
+     ]
+    },
+    "ipdSharingStatementModule": {
+     "ipdSharing": "NO"
+    }
+   },
+   "derivedSection": {
+    "miscInfoModule": {
+     "versionHolder": "2026-10-02"
+    },
+    "conditionBrowseModule": {
+     "meshes": [
+      {
+       "id": "D010612",
+       "term": "Pharyngitis"
+      }
+     ],
+     "ancestors": [
+      {
+       "id": "D012141",
+       "term": "Respiratory Tract Infections"
+      },
+      {
+       "id": "D007239",
+       "term": "Infections"
+      },
+      {
+       "id": "D010608",
+       "term": "Pharyngeal Diseases"
+      },
+      {
+       "id": "D009057",
+       "term": "Stomatognathic Diseases"
+      },
+      {
+       "id": "D012140",
+       "term": "Respiratory Tract Diseases"
+      },
+      {
+       "id": "D010038",
+       "term": "Otorhinolaryngologic Diseases"
+      }
+     ]
+    }
+   },
+   "hasResults": false
+  },
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT07845526",
+     "orgStudyIdInfo": {
+      "id": "STUDY26060067"
+     },
+     "secondaryIdInfos": [
+      {
+       "id": "R01AI201390",
+       "type": "NIH",
+       "link": "https://reporter.nih.gov/quickSearch/R01AI201390"
+      }
+     ],
+     "organization": {
+      "fullName": "University of Pittsburgh",
+      "class": "OTHER"
+     },
+     "briefTitle": "Enhanced Telemedicine in Primary Care for Acute Respiratory Tract Infections Study",
+     "officialTitle": "Enhanced Telemedicine in Primary Care for ARTIs (Tele-PARTI) Study",
+     "acronym": "Tele-PARTI"
+    },
+    "statusModule": {
+     "statusVerifiedDate": "2026-09",
+     "overallStatus": "NOT_YET_RECRUITING",
+     "expandedAccessInfo": {
+      "hasExpandedAccess": false
+     },
+     "startDateStruct": {
+      "date": "2026-11",
+      "type": "ESTIMATED"
+     },
+     "primaryCompletionDateStruct": {
+      "date": "2030-04",
+      "type": "ESTIMATED"
+     },
+     "completionDateStruct": {
+      "date": "2030-04",
+      "type": "ESTIMATED"
+     },
+     "studyFirstSubmitDate": "2026-09-22",
+     "studyFirstSubmitQcDate": "2026-09-22",
+     "studyFirstPostDateStruct": {
+      "date": "2026-09-29",
+      "type": "ACTUAL"
+     },
+     "lastUpdateSubmitDate": "2026-09-22",
+     "lastUpdatePostDateStruct": {
+      "date": "2026-09-29",
+      "type": "ACTUAL"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "responsibleParty": {
+      "type": "PRINCIPAL_INVESTIGATOR",
+      "investigatorFullName": "Kristin Ray",
+      "investigatorTitle": "Associate Professor of Pediatrics",
+      "investigatorAffiliation": "University of Pittsburgh"
+     },
+     "leadSponsor": {
+      "name": "University of Pittsburgh",
+      "class": "OTHER"
+     },
+     "collaborators": [
+      {
+       "name": "National Institute of Allergy and Infectious Diseases (NIAID)",
+       "class": "NIH"
+      }
+     ]
+    },
+    "oversightModule": {
+     "oversightHasDmc": false,
+     "isFdaRegulatedDrug": false,
+     "isFdaRegulatedDevice": false
+    },
+    "descriptionModule": {
+     "briefSummary": "Young children often receive antibiotics for pediatric acute respiratory tract infections (ARTIs) - common childhood diagnoses like ear infections, strep throat, sinusitis, and colds - but many of these antibiotics are prescribed unnecessarily for viral infections, where antibiotics will not help. Helping families and pediatricians to evaluate children with ARTIs through primary care telemedicine visits using at-home tele-otoscopes vs. at-home eBooks could help reduce unnecessary antibiotic exposure in children. In this clinical trial, we will assess the impact of at-home tele-otoscope vs. eBook enabled primary care telemedicine on antibiotic use, healthcare utilization, and healthcare costs for young children.",
+     "detailedDescription": "This is an interventional study. In this two-arm randomized controlled trial, randomization will occur stratified by child age at enrollment (6-14 months, 15-23 months) and study site. The trial will be conducted in academic and community pediatric practices. This study includes two prespecified, parallel analyses in the following aims:\n\nAim 1: Assess the impact of tele-otoscope vs. eBook enabled primary care practice (PCP) telemedicine for pediatric ARTIs on antibiotic prescribing and healthcare utilization among young children who have at least one prior episode of AOM.\n\nAim 2: Assess the economic consequences from a payer perspective of providing at-home tele-otoscopes vs. eBooks to young children who have at least a prior episode of AOM."
+    },
+    "conditionsModule": {
+     "conditions": [
+      "Acute Respiratory Tract Infection",
+      "Ear Infection",
+      "Throat Infection",
+      "Acute Respiratory Tract Infections",
+      "Common Cold"
+     ],
+     "keywords": [
+      "acute respiratory tract infection",
+      "ear infection",
+      "pediatric",
+      "telemedicine"
+     ]
+    },
+    "designModule": {
+     "studyType": "INTERVENTIONAL",
+     "phases": [
+      "NA"
+     ],
+     "designInfo": {
+      "allocation": "RANDOMIZED",
+      "interventionModel": "PARALLEL",
+      "primaryPurpose": "HEALTH_SERVICES_RESEARCH",
+      "maskingInfo": {
+       "masking": "SINGLE",
+       "whoMasked": [
+        "OUTCOMES_ASSESSOR"
+       ]
+      }
+     },
+     "enrollmentInfo": {
+      "count": 450,
+      "type": "ESTIMATED"
+     }
+    },
+    "armsInterventionsModule": {
+     "armGroups": [
+      {
+       "label": "Tele-Otoscope",
+       "type": "EXPERIMENTAL",
+       "description": "Children randomized to the experimental arm will receive a tele- otoscope and ear irrigation device (to assist cerumen removal if needed); parents will be trained on the use of these devices. Parents will be asked to download the tele-otoscope app which will allow them to view and record from the tele-otoscope camera. These devices (tele-otoscope and ear irrigation device) are commercially available and their functionality is not being tested in this study.",
+       "interventionNames": [
+        "Other: Tele-Otoscope Enabled Primary Care"
+       ]
+      },
+      {
+       "label": "eBook",
+       "type": "PLACEBO_COMPARATOR",
+       "description": "Children randomized to the control arm will receive an eBook on baby and toddler care from the American Academy of Pediatrics. As in prior studies of tele-services, we will provide the eBook as a \"digital placebo.\" Thus, participants in both arms receive an electronic resource, but the eBook has limited content specific to ARTI care, such that it is not expected to significantly influence study outcomes.",
+       "interventionNames": [
+        "Other: eBook-supported primary care"
+       ]
+      }
+     ],
+     "interventions": [
+      {
+       "type": "OTHER",
+       "name": "Tele-Otoscope Enabled Primary Care",
+       "description": "Children randomized to the experimental arm will receive a tele- otoscope and ear irrigation device (to assist cerumen removal if needed); parents will be trained on the use of these devices. Parents will be asked to download the tele-otoscope app which will allow them to view and record from the tele-otoscope camera. These devices (tele-otoscope and ear irrigation device) are commercially available and their functionality is not being tested in this study, which focuses instead on testing the impact of their availability when integrated into primary care telemedicine.",
+       "armGroupLabels": [
+        "Tele-Otoscope"
+       ]
+      },
+      {
+       "type": "OTHER",
+       "name": "eBook-supported primary care",
+       "description": "Children randomized to the control arm will receive an eBook on baby and toddler care from the American Academy of Pediatrics. As in prior studies of tele-services, we will provide the eBook as a \"digital placebo.\" Thus, participants in both arms receive an electronic resource, but the eBook has limited content specific to ARTI care, such that it is not expected to significantly influence study outcomes.",
+       "armGroupLabels": [
+        "eBook"
+       ]
+      }
+     ]
+    },
+    "outcomesModule": {
+     "primaryOutcomes": [
+      {
+       "measure": "Number of ARTI antibiotics",
+       "description": "Number of antibiotic courses prescribed for acute respiratory tract infections (ARTIs) per participant from enrollment through 12 months after enrollment. An antibiotic course is defined according to the study protocol. This is the primary outcome for the first pre-specified analysis.",
+       "timeFrame": "From enrollment through 12 months after enrollment"
+      },
+      {
+       "measure": "Total annual healthcare costs from the payer perspective",
+       "description": "Total healthcare costs incurred per participant from the payer perspective from enrollment through 12 months after enrollment, reported in U.S. dollars. This is the primary outcome for the second pre-specified analysis.",
+       "timeFrame": "From enrollment through 12 months after enrollment"
+      }
+     ],
+     "secondaryOutcomes": [
+      {
+       "measure": "Number of ARTI antibiotic days prescribed",
+       "description": "Total number of days of antibiotic therapy prescribed for ARTI per participant from enrollment through 12 months after enrollment. This is a secondary outcome for the first pre-specified analysis.",
+       "timeFrame": "From enrollment through 12 months after enrollment"
+      },
+      {
+       "measure": "Number of ARTI broad-spectrum antibiotic courses",
+       "description": "Number of broad-spectrum antibiotic courses prescribed for ARTI per participant from enrollment through 12 months after enrollment. Broad-spectrum antibiotics are defined according to the study protocol. This is a secondary outcome for the first pre-specified analysis.",
+       "timeFrame": "From enrollment through 12 months after enrollment"
+      },
+      {
+       "measure": "Number of total antibiotic courses (any diagnosis)",
+       "description": "Number of antibiotic courses prescribed for any diagnosis per participant from enrollment through 12 months after enrollment. This is a secondary outcome for the first pre-specified analysis.",
+       "timeFrame": "From enrollment through 12 months after enrollment"
+      },
+      {
+       "measure": "Number of ARTI visits overall and by site (ED, urgent care, primary care)",
+       "description": "Number of visits for acute respiratory tract infections (ARTIs) per participant from enrollment through 12 months after enrollment, summarized overall and by visit setting (emergency department, urgent care, and primary care). This is a secondary outcome for the first pre-specified analysis.",
+       "timeFrame": "From enrollment through 12 months after enrollment"
+      },
+      {
+       "measure": "Percentage of ARTI visits resulting in antibiotic prescription",
+       "description": "Percentage of ARTI visits resulting in an antibiotic prescription from enrollment through 12 months after enrollment, summarized overall and by visit setting (emergency department, urgent care, and primary care). This is a secondary outcome for the first pre-specified analysis.",
+       "timeFrame": "From enrollment through 12 months after enrollment"
+      },
+      {
+       "measure": "Total annual family out of pocket costs",
+       "description": "Total family out-of-pocket healthcare costs per participant from enrollment through 12 months after enrollment, reported in U.S. dollars. This is a secondary outcome for the second pre-specified analysis.",
+       "timeFrame": "From enrollment through 12 months after enrollment"
+      },
+      {
+       "measure": "Total annual costs from the primary care practice perspective",
+       "description": "Total healthcare costs from the primary care practice perspective per participant from enrollment through 12 months after enrollment, reported in U.S. dollars. This is a secondary outcome for the second pre-specified analysis.",
+       "timeFrame": "From enrollment through 12 months after enrollment"
+      }
+     ]
+    },
+    "eligibilityModule": {
+     "eligibilityCriteria": "Inclusion Criteria:\n\n* Child receives primary care at a participating study site\n* Child is between 6 months 0 days and 23 months 29 days\n* Child has one or more documented acute otitis media infections (diagnosed on the day of enrollment or previously)\n* Child presents with an adult who is the biological parent or legally authorized representative able to provide consent for the child's participation in the study.\n\nExclusion Criteria:\n\n* Adult caregiver not able to participate in informed consent in English or Spanish\n* Child has congenital anomaly of face or ears\n* Child has history of myringotomy tube placement\n* Family lacks smart phone in household to pair with otoscope\n* Sibling or other child in same household already enrolled",
+     "healthyVolunteers": false,
+     "sex": "ALL",
+     "minimumAge": "6 Months",
+     "maximumAge": "24 Months",
+     "stdAges": [
+      "CHILD"
+     ]
+    },
+    "contactsLocationsModule": {
+     "centralContacts": [
+      {
+       "name": "Kristin Ray, MD, MS",
+       "role": "CONTACT",
+       "phone": "412-465-0173‬",
+       "email": "knr16@pitt.edu"
+      }
+     ],
+     "overallOfficials": [
+      {
+       "name": "Kristin Ray, MD, MS",
+       "affiliation": "University of Pittsburgh",
+       "role": "PRINCIPAL_INVESTIGATOR"
+      }
+     ],
+     "locations": [
+      {
+       "facility": "UPMC Children's Community Pediatrics",
+       "city": "Pittsburgh",
+       "state": "Pennsylvania",
+       "zip": "15213",
+       "country": "United States",
+       "contacts": [
+        {
+         "name": "CCP Research Medical Director",
+         "role": "CONTACT",
+         "phone": "412-465-0173‬",
+         "email": "patrick.tate2@chp.edu"
+        }
+       ],
+       "geoPoint": {
+        "lat": 40.44062,
+        "lon": -79.99589
+       }
+      },
+      {
+       "facility": "UPMC Children's Hospital of Pittsburgh Primary Care Center",
+       "city": "Pittsburgh",
+       "state": "Pennsylvania",
+       "zip": "15213",
+       "country": "United States",
+       "contacts": [
+        {
+         "name": "Kristin Ray, MD, MS",
+         "role": "CONTACT",
+         "phone": "412-465-0173‬",
+         "email": "knr16@pitt.edu"
+        },
+        {
+         "name": "Kristin Ray, MD, MS",
+         "role": "PRINCIPAL_INVESTIGATOR"
+        }
+       ],
+       "geoPoint": {
+        "lat": 40.44062,
+        "lon": -79.99589
+       }
+      }
+     ]
+    },
+    "ipdSharingStatementModule": {
+     "ipdSharing": "YES",
+     "description": "Individual participant data that underlie the results reported in this article, after deidentification (test, tables, figures, and appendices).",
+     "timeFrame": "12 months after final publication until 36 months after publication",
+     "accessCriteria": "Researchers will be able to access de-identified IPD by contacting the principal investigator and securing data use agreements."
+    }
+   },
+   "derivedSection": {
+    "miscInfoModule": {
+     "versionHolder": "2026-10-02"
+    },
+    "conditionBrowseModule": {
+     "meshes": [
+      {
+       "id": "D010031",
+       "term": "Otitis"
+      },
+      {
+       "id": "D010612",
+       "term": "Pharyngitis"
+      },
+      {
+       "id": "D003139",
+       "term": "Common Cold"
+      }
+     ],
+     "ancestors": [
+      {
+       "id": "D004427",
+       "term": "Ear Diseases"
+      },
+      {
+       "id": "D010038",
+       "term": "Otorhinolaryngologic Diseases"
+      },
+      {
+       "id": "D012141",
+       "term": "Respiratory Tract Infections"
+      },
+      {
+       "id": "D007239",
+       "term": "Infections"
+      },
+      {
+       "id": "D010608",
+       "term": "Pharyngeal Diseases"
+      },
+      {
+       "id": "D009057",
+       "term": "Stomatognathic Diseases"
+      },
+      {
+       "id": "D012140",
+       "term": "Respiratory Tract Diseases"
+      },
+      {
+       "id": "D010850",
+       "term": "Picornaviridae Infections"
+      },
+      {
+       "id": "D012327",
+       "term": "RNA Virus Infections"
+      },
+      {
+       "id": "D014777",
+       "term": "Virus Diseases"
+      }
+     ]
+    }
+   },
+   "hasResults": false
+  }
+ ]
+}

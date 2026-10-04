@@ -1,0 +1,155 @@
+# PubMed-figyelő – mit figyeljen.
+# A kézbesítés (SMTP, ütemezés, API) a környezeti változókból jön (compose.yaml).
+#
+# A lekérdezések PubMed-szintaxisúak. A {nev} helyére a `blocks` azonos nevű
+# építőköve kerül, így egy szűrőt elég egy helyen javítani.
+
+# Hány napot nézzen vissza minden futás (a duplikátumokat a PMID kiszűri,
+# így egy kimaradt nap sem jelent elveszett cikket).
+lookback_days: 2
+# Az első futás ennyi napot tölt be alapállapotnak (erről csak összegző levél megy).
+baseline_days: 7
+# A szabad hozzáférésű (OA) PDF-et ennyi napig keressük újra azoknál a cikkeknél,
+# amelyeknek még nincs (a PMC-másolat gyakran napokkal később jelenik meg).
+oa_recheck_days: 30
+# Küldjön-e levelet akkor is, ha nincs új tétel.
+send_empty: false
+
+blocks:
+  # gyermek – laza (abstract is): csak a kis, nagy értékű témákhoz
+  ped_loose: >-
+    ("Pediatrics"[MeSH] OR child*[tiab] OR paediatr*[tiab] OR pediatr*[tiab] OR infant*[tiab]
+    OR neonat*[tiab] OR newborn*[tiab] OR adolescen*[tiab] OR preterm[tiab])
+  # gyermek – szigorú: a címben vagy a folyóirat nevében
+  ped_title: >-
+    (child*[ti] OR paediatr*[ti] OR pediatr*[ti] OR infant*[ti] OR neonat*[ti] OR newborn*[ti]
+    OR adolescen*[ti] OR preterm[ti] OR youth[ti] OR juvenile[ti] OR "school-age*"[ti] OR kindergarten*[ti]
+    OR pediatr*[ta] OR paediatr*[ta] OR neonat*[ta] OR perinat*[ta] OR child*[ta] OR infant*[ta])
+  infection: >-
+    ("Infections"[MeSH] OR "Communicable Diseases"[MeSH] OR "Anti-Infective Agents"[MeSH] OR "Vaccination"[MeSH]
+    OR infect*[tiab] OR sepsis[tiab] OR septic[tiab] OR antibiotic*[tiab] OR antimicrobial*[tiab] OR antiviral*[tiab]
+    OR antifungal*[tiab] OR vaccin*[tiab] OR pneumonia[tiab] OR meningitis[tiab] OR bacteremia[tiab] OR bacteraemia[tiab])
+  # infektológia – szigorú: a címben, vagy ID-folyóiratban
+  infection_title: >-
+    (infect*[ti] OR sepsis[ti] OR septic[ti] OR antibiotic*[ti] OR antimicrobial*[ti] OR antiviral*[ti] OR antifungal*[ti]
+    OR vaccin*[ti] OR immunization[ti] OR immunisation[ti] OR pneumonia[ti] OR meningitis[ti] OR encephalitis[ti]
+    OR bacteremia[ti] OR bacteraemia[ti] OR osteomyelitis[ti] OR endocarditis[ti] OR tuberculosis[ti] OR HIV[ti]
+    OR hepatitis[ti] OR COVID*[ti] OR SARS-CoV-2[ti] OR influenza[ti] OR RSV[ti] OR "respiratory syncytial"[ti]
+    OR measles[ti] OR pertussis[ti] OR malaria[ti] OR fungal[ti] OR candid*[ti] OR aspergill*[ti] OR cytomegalovirus[ti]
+    OR CMV[ti] OR "urinary tract"[ti] OR otitis[ti] OR pharyngitis[ti] OR bronchiolitis[ti] OR cellulitis[ti]
+    OR staphylococc*[ti] OR streptococc*[ti] OR "Clostridioides"[ti] OR "drug-resistan*"[ti] OR "antimicrobial resistance"[ti]
+    OR "antibiotic resistance"[ti] OR multidrug[ti] OR carbapenem*[ti]
+    OR infect*[ta] OR "Antimicrob Agents Chemother"[ta] OR "J Antimicrob Chemother"[ta] OR "Euro Surveill"[ta] OR "Vaccine"[ta])
+  no_veterinary: >-
+    NOT (veterinar*[ti] OR canine[ti] OR bovine[ti] OR porcine[ti] OR swine[ti] OR poultry[ti] OR livestock[ti]
+    OR cattle[ti] OR veterin*[ta])
+  guideline: >-
+    (Guideline[pt] OR "Practice Guideline"[pt] OR guideline*[ti] OR "consensus statement*"[ti] OR "consensus guideline*"[ti]
+    OR "consensus recommendation*"[ti] OR "expert consensus"[ti] OR "consensus-based"[ti] OR "consensus document"[ti]
+    OR "consensus report"[ti] OR "position statement*"[ti] OR "position paper*"[ti] OR "practice parameter*"[ti]
+    OR "recommendations for"[ti] OR "recommendations on"[ti])
+  systematic_review: >-
+    ("Systematic Review"[pt] OR "Meta-Analysis"[pt] OR "systematic review"[ti] OR "meta-analysis"[ti]
+    OR "meta-analyses"[ti] OR "scoping review"[ti] OR "umbrella review"[ti])
+  stewardship: >-
+    ("Antimicrobial Stewardship"[MeSH] OR "Inappropriate Prescribing"[MeSH] OR stewardship[tiab]
+    OR "antibiotic prescribing"[tiab] OR "antimicrobial prescribing"[tiab] OR "antibiotic prescription*"[tiab]
+    OR "inappropriate antibiotic*"[tiab] OR "antibiotic overuse"[tiab] OR "unnecessary antibiotic*"[tiab]
+    OR "delayed prescri*"[tiab] OR "duration of antibiotic*"[tiab] OR "antibiotic duration"[tiab]
+    OR "antibiotic use"[ti] OR "antibiotic exposure"[ti] OR "antibiotic consumption"[ti] OR "antimicrobial use"[ti]
+    OR "short-course"[ti] OR "de-escalation"[ti])
+  # vezető folyóiratok a gyermekinfektológia témához (bővíthető)
+  core_journals: >-
+    ("Pediatr Infect Dis J"[ta] OR "J Pediatric Infect Dis Soc"[ta] OR "Clin Infect Dis"[ta] OR "Lancet Infect Dis"[ta]
+    OR "Lancet Child Adolesc Health"[ta] OR "JAMA Pediatr"[ta] OR "Pediatrics"[ta] OR "Arch Dis Child"[ta]
+    OR "Eur J Pediatr"[ta] OR "J Pediatr"[ta] OR "Clin Microbiol Infect"[ta] OR "J Antimicrob Chemother"[ta]
+    OR "Emerg Infect Dis"[ta] OR "Euro Surveill"[ta] OR "Open Forum Infect Dis"[ta] OR "BMJ"[ta] OR "N Engl J Med"[ta]
+    OR "Lancet"[ta] OR "JAMA"[ta] OR "JAMA Netw Open"[ta] OR "J Infect"[ta] OR "Int J Infect Dis"[ta])
+  rct: >-
+    ("Randomized Controlled Trial"[pt] OR randomi*[ti] OR "randomised controlled"[tiab] OR "randomized controlled"[tiab])
+  digital: >-
+    ("Artificial Intelligence"[MeSH] OR "Telemedicine"[MeSH] OR "Decision Support Systems, Clinical"[MeSH]
+    OR "artificial intelligence"[tiab] OR "machine learning"[tiab] OR "deep learning"[tiab] OR "large language model*"[tiab]
+    OR ChatGPT[tiab] OR telehealth[tiab] OR telemedicine[tiab] OR "digital health"[tiab] OR "mobile health"[tiab]
+    OR mHealth[tiab] OR "clinical decision support"[tiab])
+  diagnostics: >-
+    ("Point-of-Care Testing"[MeSH] OR "point-of-care"[tiab] OR "rapid test*"[tiab] OR "rapid diagnostic*"[tiab]
+    OR "rapid molecular"[tiab] OR "multiplex PCR"[tiab] OR "syndromic panel*"[tiab] OR metagenomic*[tiab]
+    OR "host response"[tiab] OR "host-response"[tiab] OR (biomarker*[ti] AND {infection}))
+  trial_protocol: >-
+    (("Clinical Trial Protocol"[pt] OR (protocol[ti] AND (trial[tiab] OR randomi*[tiab] OR study[ti])))
+    NOT ("systematic review"[ti] OR "scoping review"[ti] OR "meta-analysis"[ti]))
+  exclude: >-
+    NOT (Comment[pt] OR Letter[pt] OR Editorial[pt] OR News[pt] OR "Published Erratum"[pt] OR "Case Reports"[pt]
+    OR erratum[ti] OR correction[ti] OR retracted[ti]) NOT ("Animals"[MeSH] NOT "Humans"[MeSH])
+
+# Témák PRIORITÁSI sorrendben: ha egy cikk több témába is esik, a levélben az első
+# találó téma szekciójában jelenik meg (a többi címkeként). Az irányelvek mindig az
+# "iranyelvek" szekcióba kerülnek. Az adatbázis minden témát rögzít.
+topics:
+  - id: protokoll
+    label: Vizsgálati protokoll
+    section: vizsgalatok
+    query: '{ped_loose} AND ({infection} OR {stewardship}) AND {trial_protocol} {exclude}'
+  - id: gyermek-ams
+    label: Gyermek-AMS
+    section: gyermek-ams
+    query: '{ped_loose} AND {stewardship} {exclude}'
+  - id: gyermekinfektologia
+    label: Gyermekinfektológia
+    section: gyermekinfektologia
+    query: '{ped_title} AND {infection} AND ({core_journals} OR {rct}) {exclude}'
+  - id: gyermek-iranyelv-review
+    label: Gyermekgyógyászat
+    section: review-gyermek
+    query: '{ped_title} AND ({guideline} OR {systematic_review}) {exclude}'
+  - id: infektologia-iranyelv-review
+    label: Infektológia
+    section: review-infektologia
+    query: '{infection_title} AND ({guideline} OR {systematic_review}) {no_veterinary} {exclude}'
+  - id: innovacio
+    label: Innováció
+    section: innovacio
+    query: '{ped_title} AND ({digital} OR {diagnostics}) {exclude}'
+
+# A levél szekciói, ebben a sorrendben. style: full = adatlap abstract-részlettel,
+# compact = csak cím, folyóirat, linkek; trials = ClinicalTrials.gov + protokollok.
+sections:
+  - id: iranyelvek
+    title: Irányelvek és konszenzusok
+    subtitle: Gyermekgyógyászat és infektológia
+    style: full
+  - id: gyermek-ams
+    title: Gyermek-AMS
+    style: full
+  - id: gyermekinfektologia
+    title: Gyermekinfektológia
+    subtitle: Vezető folyóiratok és RCT-k
+    style: full
+  - id: vizsgalatok
+    title: Folyamatban lévő vizsgálatok
+    subtitle: Új ClinicalTrials.gov-regisztrációk és PubMed-protokollok
+    style: trials
+  - id: review-gyermek
+    title: Szisztematikus review-k · gyermekgyógyászat
+    style: compact
+  - id: review-infektologia
+    title: Szisztematikus review-k · infektológia
+    style: compact
+  - id: innovacio
+    title: Innováció a gyermekellátásban
+    subtitle: Digitális egészség, AI, új diagnosztika
+    style: compact
+
+# Új, még nem lezárt vizsgálatok a ClinicalTrials.gov-ból (a "vizsgalatok" szekcióba).
+clinicaltrials:
+  enabled: true
+  max_age: 21 years
+  statuses: [RECRUITING, NOT_YET_RECRUITING, ACTIVE_NOT_RECRUITING, ENROLLING_BY_INVITATION]
+  # betegség-mező (a ClinicalTrials.gov szinonimákkal bővíti)
+  conditions: >-
+    Infections OR Communicable Diseases OR sepsis OR pneumonia OR meningitis OR bacteremia OR urinary tract infection
+    OR bronchiolitis OR otitis media OR tuberculosis OR HIV OR vaccine
+  # szabad szavas keresés (bárhol a regisztrációban)
+  terms: >-
+    stewardship OR "antibiotic prescribing" OR "antibiotic use" OR "antimicrobial resistance"

@@ -1,0 +1,93 @@
+# PubMed-figyelő – Synology Container Manager projekt.
+# Ugyanaz a minta, mint a hbd-inventory-watcher / surface-price-watch: kész python image,
+# induláskor letölti a programot a GitHub-ról, telepíti a függőségeket, majd elindítja
+# az API-t és a napi ütemezőt.
+#
+# Container Manager → Projekt → Létrehozás → név: pubmed-watch,
+# útvonal: /volume1/docker/pubmed-watch (benne ez a compose.yaml és egy üres data mappa).
+# Az SMTP_PASSWORD értékét kézzel kell beírni.
+services:
+  pubmed-watch:
+    image: python:3.12-slim-bookworm
+    container_name: pubmed-watch
+
+    restart: unless-stopped
+
+    environment:
+      SMTP_PASSWORD: "IDE_IRD_BE_A_TECHNIKAI_FIOK_JELSZAVAT"
+      SMTP_HOST: "mail.home.arpa"
+      SMTP_PORT: "587"
+      SMTP_SECURITY: "starttls"
+      SMTP_USER: "technikai"
+      SMTP_VERIFY_TLS: "false"
+      MAIL_FROM: "technikai@mail.home.arpa"
+      MAIL_FROM_NAME: "PubMed-figyelő"
+      MAIL_TO: "technikai@mail.home.arpa"
+      TZ: "Europe/Budapest"
+      # napi futás ideje (helyi idő)
+      RUN_AT: "06:30"
+      # "true" = a konténer indulásakor azonnal fusson egyszer (első próbához)
+      RUN_ON_START: "false"
+      # "true" = ha a konténer a RUN_AT után indul és aznap még nem volt futás, pótolja
+      CATCH_UP: "true"
+      PUBMEDWATCH_CONFIG: "/app/config/config.yaml"
+      PUBMEDWATCH_DATA: "/data"
+
+      # --- API az n8n-nek (http://192.168.1.168:8765) ---
+      API_PORT: "8765"
+      # ha nem üres, az API csak "X-API-Key: <érték>" fejléccel válaszol
+      API_TOKEN: ""
+      # n8n Webhook node URL-je; minden futás után ide megy az új tételek listája (üres = ki)
+      N8N_WEBHOOK_URL: ""
+
+      # --- opcionális ---
+      # ingyenes NCBI API-kulcs (gyorsabb lekérdezés); nélküle is működik
+      NCBI_API_KEY: ""
+      NCBI_EMAIL: ""
+      # Unpaywall: további szabad PDF-linkek a kiadói oldalakról; egy kapcsolattartó
+      # e-mail-cím kell hozzá (az Unpaywall szabálya), üresen hagyva kikapcsolva
+      UNPAYWALL_EMAIL: ""
+
+    extra_hosts:
+      - "mail.home.arpa:192.168.1.168"
+
+    ports:
+      - "8765:8765"
+
+    volumes:
+      - ./data:/data   # SQLite adatbázis (pubmed.db), napló, utolsó jelentés
+
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        set -eu
+
+        echo "PubMed-figyelő inicializálása..."
+
+        mkdir -p /data
+
+        python - <<'PY'
+        import io
+        import shutil
+        import tarfile
+        from pathlib import Path
+        from urllib.request import urlopen
+
+        URL = "https://github.com/takachlaszlo/pubmed-watch/archive/refs/heads/main.tar.gz"
+        data = urlopen(URL, timeout=120).read()
+        tmp = Path("/tmp/src")
+        shutil.rmtree(tmp, ignore_errors=True)
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
+            tar.extractall(tmp)
+        shutil.rmtree("/app", ignore_errors=True)
+        shutil.copytree(next(tmp.iterdir()), "/app")
+        PY
+
+        pip install --no-cache-dir -r /app/requirements.txt tzdata
+
+        echo "Inicializálás kész."
+        echo
+
+        cd /app
+        exec python -u -m pubmedwatch daemon
