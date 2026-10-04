@@ -74,11 +74,17 @@ Fizetős cikkekhez csak PubMed/DOI link van.
 **PDF-letöltés az n8n-ben.** Állíts be egyedi `User-Agent` fejlécet (pl. `pubmed-watch/1.0`),
 mert a Europe PMC az alapértelmezett kliens-azonosítót elutasíthatja (403).
 
-**n8n-minták:**
-- *Napi feldolgozás:* Schedule Trigger (07:00) → HTTP Request `GET http://192.168.1.168:8765/runs/latest`
-  → HTTP Request `GET .../articles?run_id={{$json.id}}&limit=1000`.
-- *Push:* a compose-ban `N8N_WEBHOOK_URL` = egy n8n Webhook node URL-je. Minden futás után POST érkezik
-  `{event, run_id, window, counts, articles[], trials[]}` tartalommal.
+**Kész n8n-workflow: [`n8n/pubmed-pdf-letoltes.workflow.json`](n8n/pubmed-pdf-letoltes.workflow.json)**
+Naponta 07:00-kor (a figyelő 06:30-as futása után) lekéri az API-ból az utolsó sikeres feldolgozás óta
+újonnan megjelent vagy PDF-linket kapott cikkeket (`updated_since` + `has_pdf=true`), a szabályok
+szerint kiválasztja a letöltendőket, letölti a PDF-eket, és az n8n `shared/pubmed-pdf/<szekció>/` mappájába
+menti (`ÉV-PMID-cím.pdf`). A szelekciós szabályok (szekciók, cikktípusok) a „Szelekció” Code node
+tetején vannak. Alapból: irányelvek, gyermek-AMS, gyermekinfektológia. Importálás: n8n → Workflows →
+Import from File, majd Active. A cél mappákat (`shared/pubmed-pdf/iranyelvek`, `gyermek-ams`,
+`gyermekinfektologia`) előre létre kell hozni.
+
+Egyéb minta: a compose-ban az `N8N_WEBHOOK_URL`-t egy n8n Webhook node URL-jére állítva minden futás után
+POST érkezik `{event, run_id, window, counts, articles[], trials[]}` tartalommal.
 
 ## Telepítés a NAS-ra
 
