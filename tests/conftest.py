@@ -36,6 +36,7 @@ def fixture_json(name: str):
 class FakeResponse:
     def __init__(self, payload=None, content: bytes = b"", status: int = 200):
         self._payload = payload
+        self.text = content.decode("utf-8", "replace") if content else ""
         self.content = content or (json.dumps(payload).encode() if payload is not None else b"")
         self.status_code = status
 
@@ -51,7 +52,8 @@ class FakeHttp:
     """Stands in for HttpClient. `topic_hits` maps a topic id to the PMIDs its search returns."""
 
     def __init__(self, cfg, topic_hits: dict[str, list[str]] | None = None, trials: dict | None = None,
-                 europepmc: dict | None = None, fail_search: bool = False):
+                 europepmc: dict | None = None, fail_search: bool = False, s3_pmcids: tuple[str, ...] = ()):
+        self.s3_pmcids = s3_pmcids
         self.query_to_topic = {t.query: t.id for t in cfg.topics}
         self.topic_hits = topic_hits or {}
         self.trials = trials if trials is not None else fixture_json("ctgov.json")
@@ -86,6 +88,14 @@ class FakeHttp:
         if "unpaywall" in url:
             return {"is_oa": False}
         raise AssertionError(f"váratlan kérés: GET {url}")
+
+    def get_text(self, url, params=None):
+        self.calls.append(("GET", url, params or {}))
+        assert "pmc-oa-opendata" in url, url
+        pmcid = params["prefix"].rstrip(".")
+        if pmcid in self.s3_pmcids:
+            return f'<ListBucketResult><Contents><Key>{pmcid}.1/{pmcid}.1.pdf</Key></Contents></ListBucketResult>'
+        return "<ListBucketResult><KeyCount>0</KeyCount></ListBucketResult>"
 
     def post_json(self, url, payload):
         self.posted.append((url, payload))

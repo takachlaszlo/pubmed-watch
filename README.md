@@ -29,7 +29,10 @@ közös építőkövekből (`blocks`). Egy szűrőt elég egy helyen javítani.
 - Egy cikk egyszer szerepel. Ha több témába is esik, a config sorrendje szerinti első téma szekciójában
   jelenik meg, a többi téma az adatbázisban rögzül.
 - Ha aznap nincs új tétel, nem megy levél (`send_empty: false`).
-- Az első futás az elmúlt 7 napot tölti be alapállapotnak, erről csak egy összegző levél megy.
+- Az első futás az elmúlt 7 napot tölti be az adatbázisba. A levél ilyenkor az utolsó 2 nap tételeit mutatja
+  teljes tartalommal (`baseline_digest_days`), a többi az adatbázisban van.
+- Egyszeri újraküldés: `DIGEST_ON_START_DAYS: "2"` a compose-ban és a projekt újraindítása. Az adatbázisból az utolsó 2
+  nap összesítőjét küldi el (minden értéknél csak egyszer). Kézzel: `python -m pubmedwatch digest --days 2 --send`.
 
 ## Adatbázis és API (n8n)
 
@@ -65,19 +68,23 @@ Egy cikk rekordja (rövidítve):
 
 `kind`: `guideline` | `systematic_review` | `protocol` | `rct` | `review` | `other`.
 
-**Szabad PDF-linkek.** A linkek a Europe PMC-ből jönnek, opcionálisan az Unpaywallból is (`UNPAYWALL_EMAIL`).
-A PMC-másolat gyakran csak napokkal a megjelenés után készül el, ezért a napi futás 30 napig újra
-ellenőrzi a PDF nélküli cikkeket. Ha talál linket, az `updated_at` mező frissül, így az n8n az
-`/articles?updated_since=...&has_pdf=true` lekérdezéssel megkapja az utólag elérhetővé vált PDF-eket.
-Fizetős cikkekhez csak PubMed/DOI link van.
+**PDF-linkek és források.** Minden cikknél a legjobb elérhető szabad PDF-link tárolódik, ebben a sorrendben:
+1. `pmc-s3`: a PMC Article Datasets nyilvános AWS-tárolója (`pmc-oa-opendata`). Közvetlen PDF, programból is
+   megbízhatóan letölthető, és gépi hozzáférésre készült. Csak az újrafelhasználást engedő licencű cikkek vannak benne.
+2. `unpaywall`: kiadói szabad PDF-ek (opcionális, `UNPAYWALL_EMAIL`).
+3. `europepmc`: a Europe PMC webes PDF-je. Böngészőből kattintva működik (ez van a levélben is, ha más nincs),
+   de programnak nem szabad letölteni, mert Cloudflare böngészőellenőrzés áll előtte, amit nem kerülünk meg.
 
-**PDF-letöltés az n8n-ben.** Állíts be egyedi `User-Agent` fejlécet (pl. `pubmed-watch/1.0`),
-mert a Europe PMC az alapértelmezett kliens-azonosítót elutasíthatja (403).
+Az `/articles` rekord `pdf_source` mezője megmondja, melyik forrásról van szó, szűrni is lehet rá
+(`?pdf_source=pmc-s3`). A PMC-másolat gyakran csak napokkal a megjelenés után kerül a tárolóba, ezért a
+napi futás 30 napig újra ellenőrzi azokat, amelyeknek még nincs `pmc-s3` vagy `unpaywall` linkjük. Ha jobb
+forrást talál, az `updated_at` mező frissül, így az n8n az `/articles?updated_since=...` lekérdezéssel megkapja
+az utólag letölthetővé váltakat. Fizetős cikkekhez csak PubMed/DOI link van.
 
 **Kész n8n-workflow: [`n8n/pubmed-pdf-letoltes.workflow.json`](n8n/pubmed-pdf-letoltes.workflow.json)**
 Naponta 07:00-kor (a figyelő 06:30-as futása után) lekéri az API-ból az utolsó sikeres feldolgozás óta
 újonnan megjelent vagy PDF-linket kapott cikkeket (`updated_since` + `has_pdf=true`), a szabályok
-szerint kiválasztja a letöltendőket, letölti a PDF-eket, és az n8n `shared/pubmed-pdf/<szekció>/` mappájába
+szerint kiválasztja a letöltendőket (csak `pmc-s3`/`unpaywall` forrásból, 3 próbálkozással), letölti a PDF-eket, és az n8n `shared/pubmed-pdf/<szekció>/` mappájába
 menti (`ÉV-PMID-cím.pdf`). A szelekciós szabályok (szekciók, cikktípusok) a „Szelekció” Code node
 tetején vannak. Alapból: irányelvek, gyermek-AMS, gyermekinfektológia. Importálás: n8n → Workflows →
 Import from File, majd Active. A cél mappákat (`shared/pubmed-pdf/iranyelvek`, `gyermek-ams`,

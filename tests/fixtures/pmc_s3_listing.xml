@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>pmc-oa-opendata</Name><Prefix>PMC13625194.</Prefix><KeyCount>4</KeyCount><MaxKeys>50</MaxKeys><IsTruncated>false</IsTruncated><Contents><Key>PMC13625194.1/PMC13625194.1.json</Key></Contents><Contents><Key>PMC13625194.1/PMC13625194.1.pdf</Key></Contents><Contents><Key>PMC13625194.1/PMC13625194.1.xml</Key></Contents><Contents><Key>PMC13625194.1/ofag485f1.webp</Key></Contents></ListBucketResult>

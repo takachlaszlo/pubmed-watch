@@ -10,7 +10,7 @@ from logging.handlers import RotatingFileHandler
 from .config import load_config
 from .mailer import send
 from .pubmed import PubMed
-from .runner import make_http, run_once
+from .runner import make_http, refresh_links, run_once, send_digest
 from .scheduler import daemon
 
 
@@ -40,6 +40,10 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--no-mail", action="store_true", help="ne küldjön levelet, csak mentse a jelentést")
     counts = sub.add_parser("counts", help="témánkénti találatszám az elmúlt napokban (lekérdezések hangolásához)")
     counts.add_argument("--days", type=int, default=30)
+    digest = sub.add_parser("digest", help="összesítő az adatbázisból az utolsó N napról (alapból csak kiírja)")
+    digest.add_argument("--days", type=int, default=2)
+    digest.add_argument("--send", action="store_true", help="el is küldi e-mailben")
+    sub.add_parser("refresh-links", help="PDF/teljes szöveg linkek újrakeresése a friss cikkeknél")
     sub.add_parser("serve", help="csak az API futtatása")
     sub.add_parser("test-mail", help="próbalevél küldése az SMTP-beállítások ellenőrzéséhez")
     args = parser.parse_args(argv)
@@ -59,6 +63,10 @@ def main(argv: list[str] | None = None) -> int:
         for topic in cfg.topics:
             n = pubmed.count(topic.query, since, until)
             print(f"{topic.id:<30} {n:6}  ~{n / args.days:6.1f}/nap")
+    elif args.command == "digest":
+        print(send_digest(cfg, args.days, send_mail=args.send).text)
+    elif args.command == "refresh-links":
+        print(f"frissült: {refresh_links(cfg)}")
     elif args.command == "serve":
         from .api import make_server
         server = make_server(cfg)

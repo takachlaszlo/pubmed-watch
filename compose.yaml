@@ -30,6 +30,9 @@ services:
       RUN_ON_START: "false"
       # "true" = ha a konténer a RUN_AT után indul és aznap még nem volt futás, pótolja
       CATCH_UP: "true"
+      # egyszeri összesítő levél az adatbázisból az utolsó N napról (0 = ki). Minden értéknél csak egyszer
+      # küld; újabb küldéshez írj be másik számot.
+      DIGEST_ON_START_DAYS: "0"
       PUBMEDWATCH_CONFIG: "/app/config/config.yaml"
       PUBMEDWATCH_DATA: "/data"
 

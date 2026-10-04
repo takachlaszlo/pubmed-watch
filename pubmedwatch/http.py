@@ -51,5 +51,8 @@ class HttpClient:
     def get_json(self, url: str, params: dict | None = None) -> dict:
         return self.request("GET", url, params=params).json()
 
+    def get_text(self, url: str, params: dict | None = None) -> str:
+        return self.request("GET", url, params=params).text
+
     def post_json(self, url: str, payload: dict) -> requests.Response:
         return self.request("POST", url, json=payload)

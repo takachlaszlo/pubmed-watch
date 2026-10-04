@@ -3,13 +3,25 @@
   "nodes": [
     {
       "parameters": {
-        "rule": { "interval": [ { "field": "days", "daysInterval": 1, "triggerAtHour": 7, "triggerAtMinute": 0 } ] }
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 7,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
       },
       "id": "a1000000-0000-4000-8000-000000000001",
       "name": "Naponta 07:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -19,7 +31,10 @@
       "name": "Időablak",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -27,40 +42,65 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "updated_since", "value": "={{ $json.since }}" },
-            { "name": "has_pdf", "value": "true" },
-            { "name": "limit", "value": "1000" }
+            {
+              "name": "updated_since",
+              "value": "={{ $json.since }}"
+            },
+            {
+              "name": "has_pdf",
+              "value": "true"
+            },
+            {
+              "name": "limit",
+              "value": "1000"
+            }
           ]
         },
-        "options": { "timeout": 60000 }
+        "options": {
+          "timeout": 60000
+        }
       },
       "id": "a1000000-0000-4000-8000-000000000003",
       "name": "Új és frissült cikkek (API)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// === SZELEKCIÓS SZABÁLYOK – itt módosíthatók ===\n// Melyik levélszekciók PDF-jét töltsük le automatikusan?\n//   iranyelvek | gyermek-ams | gyermekinfektologia | review-gyermek | review-infektologia | innovacio | vizsgalatok\n// (Új szekcióhoz előbb hozd létre a mappát: n8n/shared/pubmed-pdf/<szekció>)\nconst SECTIONS = ['iranyelvek', 'gyermek-ams', 'gyermekinfektologia'];\n// Opcionális további feltétel a cikktípusra (pl. ['guideline','systematic_review']); üres = bármi.\nconst KINDS = [];\n// ==============================================\n\nconst slug = (s) => (s || '')\n  .normalize('NFKD').replace(/[\\u0300-\\u036f]/g, '')\n  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70).replace(/-+$/, '');\n\nconst out = [];\n$input.all().forEach((item, i) => {\n  const a = item.json;\n  if (!a || !a.pmid || !a.links || !a.links.pdf) return;\n  if (!SECTIONS.includes(a.section)) return;\n  if (KINDS.length && !KINDS.includes(a.kind)) return;\n  const file = `${a.pub_year || 'xxxx'}-${a.pmid}-${slug(a.title)}.pdf`;\n  out.push({ json: { pmid: a.pmid, section: a.section, title: a.title, pdfUrl: a.links.pdf, path: `/files/pubmed-pdf/${a.section}/${file}` }, pairedItem: { item: i } });\n});\nreturn out;"
+        "jsCode": "// === SZELEKCIÓS SZABÁLYOK – itt módosíthatók ===\n// Melyik levélszekciók PDF-jét töltsük le automatikusan?\n//   iranyelvek | gyermek-ams | gyermekinfektologia | review-gyermek | review-infektologia | innovacio | vizsgalatok\n// (Új szekcióhoz előbb hozd létre a mappát: n8n/shared/pubmed-pdf/<szekció>)\nconst SECTIONS = ['iranyelvek', 'gyermek-ams', 'gyermekinfektologia'];\n// Opcionális további feltétel a cikktípusra (pl. ['guideline','systematic_review']); üres = bármi.\nconst KINDS = [];\n// Csak olyan forrásból töltünk le, amelyet program is elérhet (a Europe PMC webes PDF-je böngészőellenőrzés mögött van,\n// az a levélben kattintható link marad).\nconst SOURCES = ['pmc-s3', 'unpaywall'];\n// ==============================================\n\nconst slug = (s) => (s || '')\n  .normalize('NFKD').replace(/[\\u0300-\\u036f]/g, '')\n  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70).replace(/-+$/, '');\n\nconst out = [];\n$input.all().forEach((item, i) => {\n  const a = item.json;\n  if (!a || !a.pmid || !a.links || !a.links.pdf) return;\n  if (!SECTIONS.includes(a.section)) return;\n  if (!SOURCES.includes(a.pdf_source)) return;\n  if (KINDS.length && !KINDS.includes(a.kind)) return;\n  const file = `${a.pub_year || 'xxxx'}-${a.pmid}-${slug(a.title)}.pdf`;\n  out.push({ json: { pmid: a.pmid, section: a.section, title: a.title, pdfUrl: a.links.pdf, path: `/files/pubmed-pdf/${a.section}/${file}` }, pairedItem: { item: i } });\n});\nreturn out;"
       },
       "id": "a1000000-0000-4000-8000-000000000004",
       "name": "Szelekció",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0],
+      "position": [
+        660,
+        0
+      ],
       "alwaysOutputData": true
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
           "conditions": [
             {
               "id": "c1000000-0000-4000-8000-000000000001",
               "leftValue": "={{ $json.pdfUrl }}",
               "rightValue": "",
-              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -71,7 +111,10 @@
       "name": "Van letöltendő?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [880, -100]
+      "position": [
+        880,
+        -100
+      ]
     },
     {
       "parameters": {
@@ -79,32 +122,58 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "User-Agent", "value": "pubmed-watch/1.0 (+https://github.com/takachlaszlo/pubmed-watch)" }
+            {
+              "name": "User-Agent",
+              "value": "pubmed-watch/1.0 (+https://github.com/takachlaszlo/pubmed-watch)"
+            }
           ]
         },
         "options": {
-          "response": { "response": { "neverError": true, "responseFormat": "file" } },
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
           "timeout": 120000,
-          "batching": { "batch": { "batchSize": 1, "batchInterval": 1500 } }
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          }
         }
       },
       "id": "a1000000-0000-4000-8000-000000000006",
       "name": "PDF letöltése",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, -200],
-      "onError": "continueRegularOutput"
+      "position": [
+        1100,
+        -200
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "id": "c1000000-0000-4000-8000-000000000002",
-              "leftValue": "={{ $binary.data ? $binary.data.mimeType : '' }}",
-              "rightValue": "pdf",
-              "operator": { "type": "string", "operation": "contains" }
+              "leftValue": "={{ !!$binary.data && ($binary.data.fileExtension === 'pdf' || String($binary.data.mimeType || '').includes('pdf')) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -115,7 +184,10 @@
       "name": "Tényleg PDF?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1320, -200]
+      "position": [
+        1320,
+        -200
+      ]
     },
     {
       "parameters": {
@@ -128,7 +200,10 @@
       "name": "Mentés a NAS-ra",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [1540, -300]
+      "position": [
+        1540,
+        -300
+      ]
     },
     {
       "parameters": {
@@ -138,18 +213,100 @@
       "name": "Lezárás",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 120],
+      "position": [
+        880,
+        120
+      ],
       "executeOnce": true
     }
   ],
   "connections": {
-    "Naponta 07:00": { "main": [ [ { "node": "Időablak", "type": "main", "index": 0 } ] ] },
-    "Időablak": { "main": [ [ { "node": "Új és frissült cikkek (API)", "type": "main", "index": 0 } ] ] },
-    "Új és frissült cikkek (API)": { "main": [ [ { "node": "Szelekció", "type": "main", "index": 0 } ] ] },
-    "Szelekció": { "main": [ [ { "node": "Van letöltendő?", "type": "main", "index": 0 }, { "node": "Lezárás", "type": "main", "index": 0 } ] ] },
-    "Van letöltendő?": { "main": [ [ { "node": "PDF letöltése", "type": "main", "index": 0 } ], [] ] },
-    "PDF letöltése": { "main": [ [ { "node": "Tényleg PDF?", "type": "main", "index": 0 } ] ] },
-    "Tényleg PDF?": { "main": [ [ { "node": "Mentés a NAS-ra", "type": "main", "index": 0 } ], [] ] }
+    "Naponta 07:00": {
+      "main": [
+        [
+          {
+            "node": "Időablak",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Időablak": {
+      "main": [
+        [
+          {
+            "node": "Új és frissült cikkek (API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Új és frissült cikkek (API)": {
+      "main": [
+        [
+          {
+            "node": "Szelekció",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Szelekció": {
+      "main": [
+        [
+          {
+            "node": "Van letöltendő?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Lezárás",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Van letöltendő?": {
+      "main": [
+        [
+          {
+            "node": "PDF letöltése",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "PDF letöltése": {
+      "main": [
+        [
+          {
+            "node": "Tényleg PDF?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tényleg PDF?": {
+      "main": [
+        [
+          {
+            "node": "Mentés a NAS-ra",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  }
 }

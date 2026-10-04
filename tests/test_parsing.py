@@ -4,7 +4,7 @@ from conftest import fixture_bytes, fixture_json
 
 from pubmedwatch.clinicaltrials import new_trials, parse_study
 from pubmedwatch.config import TrialsConfig
-from pubmedwatch.openaccess import parse_europepmc, parse_unpaywall
+from pubmedwatch.openaccess import parse_europepmc, parse_pmc_listing, parse_unpaywall
 from pubmedwatch.pubmed import parse_efetch
 
 
@@ -78,3 +78,9 @@ def test_clinicaltrials_paging_and_dedupe():
     assert "RANGE[2026-09-27, 2026-10-04]" in advanced
     assert "AREA[OverallStatus](RECRUITING)" in advanced and "AREA[MaximumAge]RANGE[MIN, 21 years]" in advanced
     assert len(http.params) == 4  # two pages for the condition search, two for the free-text search
+
+
+def test_pmc_s3_listing():
+    xml = fixture_bytes("pmc_s3_listing.xml").decode("utf-8")
+    assert parse_pmc_listing(xml) == "https://pmc-oa-opendata.s3.amazonaws.com/PMC13625194.1/PMC13625194.1.pdf"
+    assert parse_pmc_listing("<ListBucketResult><KeyCount>0</KeyCount></ListBucketResult>") == ""

@@ -205,37 +205,39 @@ def _summary_table(cfg: Config, groups: dict[str, dict]) -> str:
 
 
 def build(cfg: Config, day: date, window: tuple[date, date], articles: list[dict], trials: list[dict],
-          baseline: bool = False) -> Digest:
+          baseline: bool = False, baseline_total: int | None = None, subject: str | None = None,
+          lead: str | None = None) -> Digest:
+    """`baseline`: first run; `articles`/`trials` are then the recent subset worth showing in full and
+    `baseline_total` the number of items loaded into the database."""
     groups = group(cfg, articles, trials)
     total = len(articles) + len(trials)
     span = f"{window[0]:%m.%d.} – {window[1]:%m.%d.}"
     if baseline:
-        subject = f"PubMed-figyelő elindult – {total} tétel alapállapotként betöltve"
-        lead = (f"Alapállapot: {total} tétel került az adatbázisba ({window[0]:%Y.%m.%d.} óta). "
-                "Holnaptól naponta csak az új tételekről kapsz összesítőt.")
+        subject = subject or f"PubMed-figyelő elindult – az utolsó napok {total} tétele"
+        lead = lead or (f"Első futás: {baseline_total if baseline_total is not None else total} tétel került az adatbázisba "
+                        f"({window[0]:%Y.%m.%d.} óta). Alább az utolsó napok {total} tétele látható teljes tartalommal, "
+                        "a többi az adatbázisban és az API-n érhető el. Holnaptól naponta csak az új tételekről kapsz összesítőt.")
     else:
-        subject = f"PubMed-figyelő {day:%Y.%m.%d.} – {total} új tétel"
-        lead = f"{total} új tétel · PubMed-be került {span}"
+        subject = subject or f"PubMed-figyelő {day:%Y.%m.%d.} – {total} új tétel"
+        lead = lead or f"{total} új tétel · PubMed-be került {span}"
     header = (f'<div style="font-size:12px;color:{C["muted"]};">PubMed-figyelő · '
-              f'{"alapállapot" if baseline else "napi összesítő"}</div>'
+              f'{"első futás" if baseline else "napi összesítő"}</div>'
               f'<div style="font-size:22px;font-weight:700;margin-top:4px;">{_e(hu_date(day))}</div>'
-              f'<div style="font-size:14px;color:{C["muted"]};margin-top:4px;">{_e(lead)}</div>'
+              f'<div style="font-size:14px;line-height:20px;color:{C["muted"]};margin-top:4px;">{_e(lead)}</div>'
               + _summary_table(cfg, groups))
-    body = "" if baseline else "".join(_section_html(cfg, s, groups[s.id]) for s in cfg.sections)
+    body = "".join(_section_html(cfg, s, groups[s.id]) for s in cfg.sections)
     footer = ("Forrás: PubMed (Entrez-dátum szerint) és ClinicalTrials.gov (új regisztrációk, nem lezárt státusz). "
               "Minden tétel teljes adata (abstract, MeSH, linkek) az adatbázisban és az API-n érhető el.")
     return Digest(subject=subject, html=_page(subject, header, body, footer),
-                  text=build_text(cfg, day, groups, lead, baseline))
+                  text=build_text(cfg, day, groups, lead))
 
 
 # --- plain text ------------------------------------------------------------------------------
-def build_text(cfg: Config, day: date, groups: dict[str, dict], lead: str, baseline: bool) -> str:
+def build_text(cfg: Config, day: date, groups: dict[str, dict], lead: str) -> str:
     lines = [f"PubMed-figyelő – {hu_date(day)}", lead, ""]
     for s in cfg.sections:
         g = groups[s.id]
         lines.append(f"{s.title}: {len(g['articles']) + len(g['trials'])}")
-    if baseline:
-        return "\n".join(lines) + "\n"
     for s in cfg.sections:
         g = groups[s.id]
         if not g["articles"] and not g["trials"]:

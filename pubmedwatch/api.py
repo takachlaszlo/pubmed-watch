@@ -5,7 +5,7 @@ GET /topics                       topics and report sections from config.yaml
 GET /runs?limit=                  run history (newest first)
 GET /runs/latest                  last successful run
 GET /articles?...                 filters: run_id, since, updated_since (ISO date/time), topic, section,
-                                  kind, has_pdf (true/false), limit (max 1000), offset
+                                  kind, has_pdf (true/false), pdf_source (pmc-s3 | unpaywall | europepmc), limit (max 1000), offset
 GET /articles/<pmid>
 GET /trials?...                   filters: run_id, since, status, limit, offset
 GET /trials/<nct_id>
@@ -76,7 +76,8 @@ def handle(cfg: Config, storage: Storage, path: str, params: dict[str, str]) -> 
         return ok(storage.articles(run_id=_int(params, "run_id"), since=params.get("since"),
                                    updated_since=params.get("updated_since"), topic=params.get("topic"),
                                    section=params.get("section"), kind=params.get("kind"),
-                                   has_pdf=_bool(params, "has_pdf"), limit=limit, offset=offset))
+                                   has_pdf=_bool(params, "has_pdf"), pdf_source=params.get("pdf_source"),
+                                   entrez_since=params.get("entrez_since"), limit=limit, offset=offset))
     if len(parts) == 2 and parts[0] == "articles":
         article = storage.article(parts[1])
         if article is None:

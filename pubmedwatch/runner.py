@@ -11,7 +11,7 @@ from .classify import classify, section_of
 from .clinicaltrials import new_trials
 from .config import Config
 from .http import HttpClient
-from .openaccess import europepmc_links, unpaywall_links
+from .openaccess import europepmc_links, pmc_s3_links, unpaywall_links
 from .pubmed import PubMed
 from .report import Digest, build
 from .storage import Storage
@@ -36,7 +36,7 @@ def make_http(cfg: Config) -> HttpClient:
     ncbi_delay = 0.12 if cfg.sources.ncbi_api_key else 0.4  # NCBI: 10 req/s with a key, 3 without
     return HttpClient(cfg.sources.user_agent, cfg.sources.timeout,
                       {"eutils.ncbi.nlm.nih.gov": ncbi_delay, "www.ebi.ac.uk": 0.3, "api.unpaywall.org": 0.2,
-                       "clinicaltrials.gov": 0.5})
+                       "clinicaltrials.gov": 0.5, "pmc-oa-opendata.s3.amazonaws.com": 0.1})
 
 
 def search_window(storage: Storage, cfg: Config, today: date) -> tuple[date, date, bool]:
@@ -48,23 +48,59 @@ def search_window(storage: Storage, cfg: Config, today: date) -> tuple[date, dat
     return since, today, False
 
 
-def enrich_links(storage: Storage, http: HttpClient, cfg: Config, today: date) -> int:
-    """Looks up open-access full text / PDF for recent articles that have none yet."""
-    pending = storage.pending_oa((today - timedelta(days=cfg.oa_recheck_days)).isoformat(), today.isoformat())
+def enrich_links(storage: Storage, http: HttpClient, cfg: Config, today: date, force: bool = False) -> int:
+    """Open-access full text / PDF links for recent articles whose PDF can still improve.
+
+    Order of preference: PMC Article Datasets (S3, scriptable) > Unpaywall (optional) > Europe PMC web link."""
+    pending = storage.pending_oa((today - timedelta(days=cfg.oa_recheck_days)).isoformat(), today.isoformat(), force)
     if not pending:
         return 0
     changed = 0
-    found = europepmc_links(http, [p for p, _ in pending])
+    found = europepmc_links(http, [p for p, _, _ in pending])
     for pmid, links in found.items():
         changed += storage.update_oa(pmid, links)
+    pmcids = {pmid: (found[pmid].pmcid if pmid in found and found[pmid].pmcid else pmcid)
+              for pmid, _, pmcid in pending}
+    s3 = pmc_s3_links(http, {pmid: pmcid for pmid, pmcid in pmcids.items() if pmcid})
+    for pmid, links in s3.items():
+        changed += storage.update_oa(pmid, links)
     if cfg.sources.unpaywall_email:
-        missing = {p: doi for p, doi in pending if doi and not (found.get(p) and found[p].url_pdf)}
+        missing = {p: doi for p, doi, _ in pending if doi and p not in s3}
         for pmid, links in unpaywall_links(http, missing, cfg.sources.unpaywall_email).items():
             changed += storage.update_oa(pmid, links)
-    storage.mark_oa_checked(p for p, _ in pending)
+    storage.mark_oa_checked(p for p, _, _ in pending)
     storage.commit()
-    log.info("OA-linkek: %d cikk ellenőrizve, %d frissült", len(pending), changed)
+    log.info("OA-linkek: %d cikk ellenőrizve, ebből PMC S3: %d, frissült: %d", len(pending), len(s3), changed)
     return changed
+
+
+def refresh_links(cfg: Config, http: HttpClient | None = None, today: date | None = None) -> int:
+    """Link refresh on its own (used at container start, so a new link source applies without waiting a day)."""
+    storage = Storage(cfg.data_dir)
+    try:
+        return enrich_links(storage, http or make_http(cfg), cfg, today or date.today(), force=True)
+    finally:
+        storage.close()
+
+
+def send_digest(cfg: Config, days: int, today: date | None = None, send_mail: bool = True) -> Digest:
+    """Mails a digest of everything that entered PubMed in the last `days` days, straight from the database."""
+    today = today or date.today()
+    since = today - timedelta(days=days)
+    storage = Storage(cfg.data_dir)
+    try:
+        articles = storage.articles(entrez_since=since.isoformat(), limit=100_000)
+        trials = storage.trials(posted_since=since.isoformat(), limit=100_000)
+    finally:
+        storage.close()
+    total = len(articles) + len(trials)
+    digest = build(cfg, today, (since, today), articles, trials,
+                   subject=f"PubMed-figyelő {today:%Y.%m.%d.} – összesítő az utolsó {days} napról ({total} tétel)",
+                   lead=f"{total} tétel az adatbázisból · PubMed-be került {since:%m.%d.} óta")
+    if send_mail:
+        mailer.send_with_retry(cfg.mail, digest.subject, digest.html, digest.text)
+        log.info("összesítő levél elküldve (%d nap, %d tétel)", days, total)
+    return digest
 
 
 def webhook_payload(result: RunResult, articles: list[dict], trials: list[dict]) -> dict:
@@ -123,7 +159,14 @@ def run_once(cfg: Config, send_mail: bool = True, today: date | None = None, htt
 
         report_articles = storage.articles(run_id=run_id, limit=100_000)
         report_trials = storage.trials(run_id=run_id, limit=100_000)
-        digest = build(cfg, today, (since, until), report_articles, report_trials, baseline=baseline)
+        if baseline:  # the first mail shows the latest days in full; the rest is in the database
+            recent = (until - timedelta(days=cfg.baseline_digest_days)).isoformat()
+            digest = build(cfg, today, (since, until),
+                           [a for a in report_articles if a["entrez_date"] >= recent],
+                           [t for t in report_trials if t["first_posted"] >= recent],
+                           baseline=True, baseline_total=len(report_articles) + len(report_trials))
+        else:
+            digest = build(cfg, today, (since, until), report_articles, report_trials)
         cfg.data_dir.joinpath("last_report.html").write_text(digest.html, encoding="utf-8")
         cfg.data_dir.joinpath("last_report.txt").write_text(digest.text, encoding="utf-8")
 

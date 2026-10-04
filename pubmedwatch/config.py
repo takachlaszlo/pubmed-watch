@@ -60,6 +60,7 @@ class ScheduleConfig:
     run_at: str  # HH:MM local time
     run_on_start: bool
     catch_up: bool
+    digest_on_start_days: int  # 0 = off; N = once per distinct value, mail the last N days from the database
 
     @classmethod
     def from_env(cls) -> "ScheduleConfig":
@@ -67,7 +68,7 @@ class ScheduleConfig:
         if not re.fullmatch(r"\d{1,2}:\d{2}", run_at):
             raise ValueError(f"RUN_AT formátuma ÓÓ:PP legyen, nem {run_at!r}")
         return cls(run_at=run_at, run_on_start=_env_bool("RUN_ON_START", False),
-                   catch_up=_env_bool("CATCH_UP", True))
+                   catch_up=_env_bool("CATCH_UP", True), digest_on_start_days=int(_env("DIGEST_ON_START_DAYS", "0") or 0))
 
 
 @dataclass
@@ -134,6 +135,7 @@ class Config:
     lookback_days: int
     baseline_days: int
     oa_recheck_days: int
+    baseline_digest_days: int
     send_empty: bool
     data_dir: Path
     mail: MailConfig = field(default_factory=MailConfig.from_env)
@@ -198,6 +200,7 @@ def load_config(path: str | os.PathLike | None = None) -> Config:
         lookback_days=int(raw.get("lookback_days", 2)),
         baseline_days=int(raw.get("baseline_days", 7)),
         oa_recheck_days=int(raw.get("oa_recheck_days", 30)),
+        baseline_digest_days=int(raw.get("baseline_digest_days", 2)),
         send_empty=bool(raw.get("send_empty", False)),
         data_dir=Path(_env("PUBMEDWATCH_DATA", "/data")),
     )

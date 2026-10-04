@@ -23,7 +23,8 @@ def test_baseline_then_daily(cfg, mails):
     first = runner.run_once(cfg, today=DAY1, http=FakeHttp(cfg, hits))
     assert first.baseline and first.window == (date(2026, 9, 27), DAY1)
     assert (first.new_articles, first.new_trials) == (4, 3)
-    assert len(mails) == 1 and "alapállapot" in mails[0][0]
+    assert len(mails) == 1 and "elindult" in mails[0][0]
+    assert "pubmed.ncbi.nlm.nih.gov/42825830" in mails[0][1]  # the first mail carries real content, not just counts
 
     storage = Storage(cfg.data_dir)
     a = storage.article("42803594")
@@ -60,7 +61,7 @@ def test_open_access_links_reach_report_and_db(cfg, mails):
     assert storage.articles(has_pdf=True)[0]["pmid"] == "42814651"
     storage.close()
     html = (cfg.data_dir / "last_report.html").read_text(encoding="utf-8")
-    assert "alapállapot" in html
+    assert "első futás" in html
 
 
 def test_failed_run_does_not_advance_window(cfg, mails):
@@ -95,3 +96,48 @@ def test_mail_failure_keeps_data(cfg, monkeypatch):
     run = storage.runs()[0]
     assert run["status"] == "ok" and "levélküldés sikertelen" in run["message"]
     storage.close()
+
+
+def test_baseline_mail_shows_recent_days_in_full(cfg, mails):
+    cfg.baseline_digest_days = 0  # only the run day itself: the fixtures entered PubMed on 09-28 .. 10-02
+    runner.run_once(cfg, today=date(2026, 10, 2), http=FakeHttp(cfg, {"gyermek-ams": ["42825830", "42803594"]}))
+    subject, html, text = mails[0]
+    assert "42825830" in html and "42803594" not in html  # entrez 10-02 shown, 09-28 only in the database
+    assert "2 tétel került az adatbázisba" in html or "tétel került az adatbázisba" in html
+    storage = Storage(cfg.data_dir)
+    assert storage.counts()["articles"] == 2
+    storage.close()
+
+
+def test_pmc_s3_pdf_beats_europepmc_and_marks_downloadable(cfg, mails):
+    hits = {"protokoll": ["42814651"], "gyermek-ams": ["42803594"]}
+    http = FakeHttp(cfg, hits, s3_pmcids=("PMC13626073",))
+    runner.run_once(cfg, today=DAY1, http=http)
+    storage = Storage(cfg.data_dir)
+    a = storage.article("42814651")
+    assert a["pdf_source"] == "pmc-s3"
+    assert a["links"]["pdf"] == "https://pmc-oa-opendata.s3.amazonaws.com/PMC13626073.1/PMC13626073.1.pdf"
+    assert storage.articles(pdf_source="pmc-s3")[0]["pmid"] == "42814651"
+    storage.close()
+
+
+def test_refresh_links_upgrades_europepmc_link_later(cfg, mails):
+    runner.run_once(cfg, today=DAY1, http=FakeHttp(cfg, {"protokoll": ["42814651"]}))  # not in S3 yet
+    storage = Storage(cfg.data_dir)
+    assert storage.article("42814651")["pdf_source"] == "europepmc"
+    storage.close()
+    assert runner.refresh_links(cfg, http=FakeHttp(cfg, s3_pmcids=("PMC13626073",)), today=DAY1) == 1
+    storage = Storage(cfg.data_dir)
+    assert storage.article("42814651")["pdf_source"] == "pmc-s3"
+    storage.close()
+    # once on the best source it is not looked up again
+    http = FakeHttp(cfg, s3_pmcids=("PMC13626073",))
+    assert runner.refresh_links(cfg, http=http, today=DAY1) == 0 and not http.calls
+
+
+def test_send_digest_from_database(cfg, mails):
+    runner.run_once(cfg, today=DAY1, http=FakeHttp(cfg, {"gyermek-ams": ["42825830", "42803594"]}))
+    mails.clear()
+    digest = runner.send_digest(cfg, days=3, today=date(2026, 10, 3))
+    assert "összesítő az utolsó 3 napról" in digest.subject and "42825830" in digest.html
+    assert len(mails) == 1

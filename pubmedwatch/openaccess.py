@@ -5,6 +5,7 @@ Only legal open-access copies are linked; paywalled articles keep their PubMed/D
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from urllib.parse import quote
 
@@ -15,6 +16,12 @@ log = logging.getLogger(__name__)
 EUROPEPMC = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
 UNPAYWALL = "https://api.unpaywall.org/v2/"
 EPMC_BATCH = 100
+# PMC Article Datasets on AWS Open Data: public bucket meant for machine access, one prefix per article version
+PMC_BUCKET = "https://pmc-oa-opendata.s3.amazonaws.com"
+# lower rank = preferred. Only the first two can be fetched by a script (Europe PMC's web PDF sits behind a
+# browser check that must not be bypassed, so it stays a link for people)
+PDF_SOURCE_RANK = {"pmc-s3": 0, "unpaywall": 1, "europepmc": 2, "": 9}
+AUTO_DOWNLOAD_SOURCES = ("pmc-s3", "unpaywall")
 
 
 @dataclass
@@ -74,4 +81,26 @@ def unpaywall_links(http: HttpClient, dois: dict[str, str], email: str) -> dict[
         links = parse_unpaywall(data)
         if links.oa:
             found[pmid] = links
+    return found
+
+
+def parse_pmc_listing(xml: str) -> str:
+    """URL of the PDF in an S3 ListObjectsV2 answer (first version that has one), or ''."""
+    keys = re.findall(r"<Key>([^<]+)</Key>", xml)
+    pdfs = sorted(k for k in keys if k.lower().endswith(".pdf"))
+    return f"{PMC_BUCKET}/{pdfs[0]}" if pdfs else ""
+
+
+def pmc_s3_links(http: HttpClient, pmcids: dict[str, str]) -> dict[str, OaLinks]:
+    """pmcids: pmid -> PMCID. Only licences that allow reuse are in the bucket; the rest keep other sources."""
+    found: dict[str, OaLinks] = {}
+    for pmid, pmcid in pmcids.items():
+        try:
+            xml = http.get_text(PMC_BUCKET + "/", {"list-type": "2", "prefix": pmcid + ".", "max-keys": "50"})
+        except Exception as exc:
+            log.debug("PMC S3: nincs adat (%s): %s", pmcid, exc)
+            continue
+        url = parse_pmc_listing(xml)
+        if url:
+            found[pmid] = OaLinks(oa=True, pmcid=pmcid, url_pdf=url, pdf_source="pmc-s3")
     return found

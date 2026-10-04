@@ -9,6 +9,9 @@
 lookback_days: 2
 # Az első futás ennyi napot tölt be alapállapotnak (erről csak összegző levél megy).
 baseline_days: 7
+# Az alapállapot-levélben az utolsó ennyi nap tételei jelennek meg teljes tartalommal
+# (a többi az adatbázisban van).
+baseline_digest_days: 2
 # A szabad hozzáférésű (OA) PDF-et ennyi napig keressük újra azoknál a cikkeknél,
 # amelyeknek még nincs (a PMC-másolat gyakran napokkal később jelenik meg).
 oa_recheck_days: 30

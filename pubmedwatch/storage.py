@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .models import Article, Trial
-from .openaccess import OaLinks
+from .openaccess import PDF_SOURCE_RANK, OaLinks
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -181,25 +181,32 @@ class Storage:
         row = self.db.execute("SELECT kind FROM articles WHERE pmid=?", (pmid,)).fetchone()
         return row[0] if row else "other"
 
-    def pending_oa(self, since_iso: str, today_iso: str) -> list[tuple[str, str]]:
-        """(pmid, doi) of recent articles without a PDF link that were not checked today."""
-        rows = self.db.execute("SELECT pmid, doi FROM articles WHERE url_pdf='' AND first_seen_at>=? "
-                               "AND substr(oa_checked_at, 1, 10)<>?", (since_iso, today_iso))
-        return [(r[0], r[1]) for r in rows]
+    def pending_oa(self, since_iso: str, today_iso: str, force: bool = False) -> list[tuple[str, str, str]]:
+        """(pmid, doi, pmcid) of recent articles whose PDF link can still improve (none yet, or only the
+        Europe PMC web link); skips the ones already checked today unless `force`."""
+        sql = ("SELECT pmid, doi, pmcid FROM articles WHERE pdf_source IN ('', 'europepmc') AND first_seen_at>=?")
+        args: list = [since_iso]
+        if not force:
+            sql += " AND substr(oa_checked_at, 1, 10)<>?"
+            args.append(today_iso)
+        return [(r[0], r[1], r[2]) for r in self.db.execute(sql, args)]
 
     def update_oa(self, pmid: str, links: OaLinks) -> bool:
-        """Stores newly found links; returns True if something changed (updated_at moves)."""
-        row = self.db.execute("SELECT oa, pmcid, url_fulltext, url_pdf FROM articles WHERE pmid=?", (pmid,)).fetchone()
+        """Stores newly found links; a better PDF source replaces a weaker one. True if something changed."""
+        row = self.db.execute("SELECT oa, pmcid, url_fulltext, url_pdf, pdf_source FROM articles WHERE pmid=?",
+                              (pmid,)).fetchone()
         if row is None:
             return False
-        new = (int(links.oa or row["oa"]), links.pmcid or row["pmcid"], links.url_fulltext or row["url_fulltext"],
-               links.url_pdf or row["url_pdf"])
+        better_pdf = bool(links.url_pdf) and (PDF_SOURCE_RANK.get(links.pdf_source, 9)
+                                              < PDF_SOURCE_RANK.get(row["pdf_source"], 9) or not row["url_pdf"])
+        url_pdf = links.url_pdf if better_pdf else row["url_pdf"]
+        pdf_source = links.pdf_source if better_pdf else row["pdf_source"]
+        new = (int(links.oa or row["oa"]), links.pmcid or row["pmcid"], row["url_fulltext"] or links.url_fulltext,
+               url_pdf, pdf_source)
         if new == tuple(row):
             return False
-        pdf_source = links.pdf_source if links.url_pdf and not row["url_pdf"] else None
-        self.db.execute("UPDATE articles SET oa=?, pmcid=?, url_fulltext=?, url_pdf=?, "
-                        "pdf_source=COALESCE(?, pdf_source), updated_at=? WHERE pmid=?",
-                        (*new, pdf_source, now_iso(), pmid))
+        self.db.execute("UPDATE articles SET oa=?, pmcid=?, url_fulltext=?, url_pdf=?, pdf_source=?, updated_at=? "
+                        "WHERE pmid=?", (*new, now_iso(), pmid))
         return True
 
     def mark_oa_checked(self, pmids: Iterable[str]) -> None:
@@ -227,10 +234,15 @@ class Storage:
 
     def articles(self, *, run_id: int | None = None, since: str | None = None, updated_since: str | None = None,
                  topic: str | None = None, section: str | None = None, kind: str | None = None,
-                 has_pdf: bool | None = None, limit: int = 100, offset: int = 0) -> list[dict]:
+                 has_pdf: bool | None = None, entrez_since: str | None = None, pdf_source: str | None = None,
+                 limit: int = 100, offset: int = 0) -> list[dict]:
         where, args = [], []
         if run_id is not None:
             where.append("a.first_seen_run=?"); args.append(run_id)
+        if entrez_since:
+            where.append("a.entrez_date>=?"); args.append(entrez_since)
+        if pdf_source:
+            where.append("a.pdf_source=?"); args.append(pdf_source)
         if since:
             where.append("a.first_seen_at>=?"); args.append(since)
         if updated_since:
@@ -279,8 +291,10 @@ class Storage:
         return d
 
     def trials(self, *, run_id: int | None = None, since: str | None = None, status: str | None = None,
-               limit: int = 100, offset: int = 0) -> list[dict]:
+               posted_since: str | None = None, limit: int = 100, offset: int = 0) -> list[dict]:
         where, args = [], []
+        if posted_since:
+            where.append("first_posted>=?"); args.append(posted_since)
         if run_id is not None:
             where.append("first_seen_run=?"); args.append(run_id)
         if since:

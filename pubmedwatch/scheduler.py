@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from .api import serve_in_background
 from .config import load_config
-from .runner import run_once
+from .runner import refresh_links, run_once, send_digest
 from .storage import Storage
 
 log = logging.getLogger(__name__)
@@ -38,9 +38,27 @@ def _run(config_path: str | None) -> None:
         log.exception("a napi futás hibával leállt; holnap újrapróbálom (a kimaradt napokat pótolja)")
 
 
+def _startup_tasks(config_path: str | None) -> None:
+    """Link refresh (new sources apply at once) and the optional one-time digest resend."""
+    cfg = load_config(config_path)
+    try:
+        refresh_links(cfg)
+    except Exception:
+        log.exception("a linkek frissítése indításkor sikertelen; a napi futás megismétli")
+    days = cfg.schedule.digest_on_start_days
+    marker = cfg.data_dir / "digest_on_start.done"
+    if days and (not marker.exists() or marker.read_text(encoding="utf-8").strip() != str(days)):
+        try:
+            send_digest(cfg, days)
+            marker.write_text(str(days), encoding="utf-8")
+        except Exception:
+            log.exception("az egyszeri összesítő levél küldése sikertelen")
+
+
 def daemon(config_path: str | None = None) -> None:
     cfg = load_config(config_path)
     serve_in_background(cfg)
+    _startup_tasks(config_path)
     now = datetime.now()
     log.info("ütemező elindult, napi futás: %s (helyi idő: %s)", cfg.schedule.run_at, now.strftime("%Y-%m-%d %H:%M"))
 
