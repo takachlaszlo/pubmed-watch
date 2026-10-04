@@ -52,8 +52,12 @@ class FakeHttp:
     """Stands in for HttpClient. `topic_hits` maps a topic id to the PMIDs its search returns."""
 
     def __init__(self, cfg, topic_hits: dict[str, list[str]] | None = None, trials: dict | None = None,
-                 europepmc: dict | None = None, fail_search: bool = False, s3_pmcids: tuple[str, ...] = ()):
+                 europepmc: dict | None = None, fail_search: bool = False, s3_pmcids: tuple[str, ...] = (),
+                 unpaywall: dict | None = None, pdf_hosts: tuple[str, ...] = ()):
         self.s3_pmcids = s3_pmcids
+        self.unpaywall = unpaywall or {}  # DOI -> Unpaywall answer; anything else is a closed article
+        self.pdf_hosts = pdf_hosts  # hosts that really hand a PDF to a script; the rest answer 403
+        self.probes: list[str] = []
         self.query_to_topic = {t.query: t.id for t in cfg.topics}
         self.topic_hits = topic_hits or {}
         self.trials = trials if trials is not None else fixture_json("ctgov.json")
@@ -86,8 +90,14 @@ class FakeHttp:
         if "clinicaltrials.gov" in url:
             return self.trials
         if "unpaywall" in url:
-            return {"is_oa": False}
+            from urllib.parse import unquote
+            return self.unpaywall.get(unquote(url.split("/v2/", 1)[1]), {"is_oa": False})
         raise AssertionError(f"váratlan kérés: GET {url}")
+
+    def probe(self, url, nbytes=8):
+        self.probes.append(url)
+        host = urlsplit(url).hostname
+        return (200, b"%PDF-1.7") if host in self.pdf_hosts else (403, b"<!DOCTYPE")
 
     def get_text(self, url, params=None):
         self.calls.append(("GET", url, params or {}))

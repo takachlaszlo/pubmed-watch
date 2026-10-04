@@ -48,6 +48,20 @@ class HttpClient:
             time.sleep(self.backoff * attempt)
         raise RuntimeError("unreachable")
 
+    def probe(self, url: str, nbytes: int = 8) -> tuple[int, bytes]:
+        """One polite GET that reads only the first bytes: (status, head). (0, b"") if unreachable.
+        No retries: a refusal (403/429) is an answer, not something to push against."""
+        self._pace(url)
+        try:
+            resp = self.session.get(url, timeout=self.timeout, stream=True, allow_redirects=True)
+        except requests.RequestException as exc:
+            log.debug("probe sikertelen (%s): %s", urlsplit(url).hostname, exc)
+            return 0, b""
+        try:
+            return resp.status_code, next(resp.iter_content(nbytes), b"")
+        finally:
+            resp.close()
+
     def get_json(self, url: str, params: dict | None = None) -> dict:
         return self.request("GET", url, params=params).json()
 

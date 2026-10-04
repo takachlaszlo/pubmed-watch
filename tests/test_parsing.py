@@ -43,11 +43,14 @@ def test_europepmc_links():
     assert not closed.url_pdf
 
 
-def test_unpaywall_links():
-    links = parse_unpaywall({"is_oa": True, "best_oa_location": {"url_for_pdf": "https://x.org/a.pdf",
-                                                                  "url_for_landing_page": "https://x.org/a"}})
-    assert (links.oa, links.url_pdf, links.pdf_source) == (True, "https://x.org/a.pdf", "unpaywall")
-    assert parse_unpaywall({"is_oa": False, "best_oa_location": None}).url_pdf == ""
+def test_unpaywall_parse_basic():
+    links, candidates = parse_unpaywall({"is_oa": True, "best_oa_location": {"url_for_pdf": "https://x.org/a.pdf",
+                                                                          "url_for_landing_page": "https://x.org/a"},
+                                         "oa_locations": []})
+    assert (links.oa, links.url_pdf, links.url_fulltext, candidates) == (True, "https://x.org/a.pdf", "https://x.org/a",
+                                                                          ["https://x.org/a.pdf"])
+    links, candidates = parse_unpaywall({"is_oa": False, "best_oa_location": None})
+    assert (links.oa, links.url_pdf, candidates) == (False, "", [])
 
 
 def test_clinicaltrials_study():

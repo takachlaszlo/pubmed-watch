@@ -1,0 +1,94 @@
+{
+ "doi": "10.1007/s00381-026-07487-3",
+ "response": {
+  "best_oa_location": null,
+  "data_standard": 2,
+  "doi": "10.1007/s00381-026-07487-3",
+  "doi_url": "https://doi.org/10.1007/s00381-026-07487-3",
+  "first_oa_location": null,
+  "genre": "journal-article",
+  "has_repository_copy": false,
+  "is_oa": false,
+  "is_paratext": false,
+  "journal_is_in_doaj": false,
+  "journal_is_oa": false,
+  "journal_issn_l": "0256-7040",
+  "journal_issns": "0256-7040,1433-0350",
+  "journal_name": "Child s Nervous System",
+  "oa_locations": [],
+  "oa_locations_embargoed": [],
+  "oa_status": "closed",
+  "published_date": "2026-10-03",
+  "publisher": "Springer Science and Business Media LLC",
+  "title": "Predictors and causes of 30-day failure after shunt placement in pediatric hydrocephalus: a systematic review and meta-analysis",
+  "updated": "2026-10-04T09:52:32Z",
+  "year": 2026,
+  "z_authors": [
+   {
+    "author_position": "first",
+    "is_corresponding": true,
+    "raw_affiliation_strings": [
+     "Department of Biomedical Sciences, Humanitas University, Pieve Emanuele, Milan, Italy"
+    ],
+    "raw_author_name": "Leonardo Di Cosmo"
+   },
+   {
+    "author_position": "middle",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Department of Biomedical Sciences, Humanitas University, Pieve Emanuele, Milan, Italy"
+    ],
+    "raw_author_name": "Christopher Peter Imbrogno"
+   },
+   {
+    "author_position": "middle",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Department of Biomedical Sciences, Humanitas University, Pieve Emanuele, Milan, Italy"
+    ],
+    "raw_author_name": "Jad El Choueiri"
+   },
+   {
+    "author_position": "middle",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Department of Medicine, State University of Pará, Belém, Brazil"
+    ],
+    "raw_author_name": "Arthur Nantes"
+   },
+   {
+    "author_position": "middle",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Department of Biomedical Sciences, Humanitas University, Pieve Emanuele, Milan, Italy"
+    ],
+    "raw_author_name": "Joshua Vishal Sahgal"
+   },
+   {
+    "author_position": "middle",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Departments of Neurological and Orthopaedic Surgery, Duke Medical Center, Duke University School of Medicine, Durham, NC, USA"
+    ],
+    "raw_author_name": "Francesca Totis"
+   },
+   {
+    "author_position": "middle",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Department of NESMOS, Sapienza University, Rome, Italy",
+     "Department of Neurosurgery, Neurocenter of South Switzerland, EOC, Lugano, Switzerland"
+    ],
+    "raw_author_name": "Ismail Zaed"
+   },
+   {
+    "author_position": "last",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Department of Pediatric Neurosurgery, Great Ormond Street Hospital, London, UK"
+    ],
+    "raw_author_name": "Noor ul Owase Jeelani"
+   }
+  ]
+ }
+}

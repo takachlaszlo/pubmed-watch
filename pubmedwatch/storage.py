@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -181,15 +181,21 @@ class Storage:
         row = self.db.execute("SELECT kind FROM articles WHERE pmid=?", (pmid,)).fetchone()
         return row[0] if row else "other"
 
-    def pending_oa(self, since_iso: str, today_iso: str, force: bool = False) -> list[tuple[str, str, str]]:
-        """(pmid, doi, pmcid) of recent articles whose PDF link can still improve (none yet, or only the
-        Europe PMC web link); skips the ones already checked today unless `force`."""
-        sql = ("SELECT pmid, doi, pmcid FROM articles WHERE pdf_source IN ('', 'europepmc') AND first_seen_at>=?")
+    def pending_oa(self, since_iso: str, today_iso: str, force: bool = False,
+                   fresh_days: int = 7, stale_days: int = 6) -> list[tuple[str, str, str, str]]:
+        """(pmid, doi, pmcid, stored pdf url) of recent articles whose PDF link can still improve: none yet, or
+        only a link for people. Back-off: daily while the article is younger than `fresh_days`, afterwards
+        about weekly. Articles already checked today are skipped; `force` ignores both rules."""
+        sql = ("SELECT pmid, doi, pmcid, url_pdf FROM articles "
+               "WHERE pdf_source IN ('', 'europepmc', 'unpaywall-web') AND first_seen_at>=?")
         args: list = [since_iso]
         if not force:
-            sql += " AND substr(oa_checked_at, 1, 10)<>?"
-            args.append(today_iso)
-        return [(r[0], r[1], r[2]) for r in self.db.execute(sql, args)]
+            today = date.fromisoformat(today_iso)
+            sql += (" AND substr(oa_checked_at, 1, 10)<>? AND (oa_checked_at='' OR substr(first_seen_at, 1, 10)>=? "
+                    "OR substr(oa_checked_at, 1, 10)<=?)")
+            args += [today_iso, (today - timedelta(days=fresh_days)).isoformat(),
+                     (today - timedelta(days=stale_days)).isoformat()]
+        return [(r[0], r[1], r[2], r[3]) for r in self.db.execute(sql, args)]
 
     def update_oa(self, pmid: str, links: OaLinks) -> bool:
         """Stores newly found links; a better PDF source replaces a weaker one. True if something changed."""

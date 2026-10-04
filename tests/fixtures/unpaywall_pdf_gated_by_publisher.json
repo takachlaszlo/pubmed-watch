@@ -1,0 +1,90 @@
+{
+ "doi": "10.1111/jpc.70611",
+ "response": {
+  "best_oa_location": {
+   "endpoint_id": null,
+   "evidence": "deprecated",
+   "host_type": "publisher",
+   "is_best": true,
+   "license": "cc-by-nc-nd",
+   "oa_date": "2026-10-01",
+   "pmh_id": null,
+   "repository_institution": null,
+   "updated": "deprecated",
+   "url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/jpc.70611",
+   "url_for_landing_page": "https://doi.org/10.1111/jpc.70611",
+   "url_for_pdf": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/jpc.70611",
+   "version": "publishedVersion"
+  },
+  "data_standard": 2,
+  "doi": "10.1111/jpc.70611",
+  "doi_url": "https://doi.org/10.1111/jpc.70611",
+  "first_oa_location": {
+   "endpoint_id": null,
+   "evidence": "deprecated",
+   "host_type": "publisher",
+   "is_best": true,
+   "license": "cc-by-nc-nd",
+   "oa_date": "2026-10-01",
+   "pmh_id": null,
+   "repository_institution": null,
+   "updated": "deprecated",
+   "url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/jpc.70611",
+   "url_for_landing_page": "https://doi.org/10.1111/jpc.70611",
+   "url_for_pdf": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/jpc.70611",
+   "version": "publishedVersion"
+  },
+  "genre": "journal-article",
+  "has_repository_copy": false,
+  "is_oa": true,
+  "is_paratext": false,
+  "journal_is_in_doaj": false,
+  "journal_is_oa": false,
+  "journal_issn_l": "1034-4810",
+  "journal_issns": "1034-4810,1440-1754",
+  "journal_name": "Journal of Paediatrics and Child Health",
+  "oa_locations": [
+   {
+    "endpoint_id": null,
+    "evidence": "deprecated",
+    "host_type": "publisher",
+    "is_best": true,
+    "license": "cc-by-nc-nd",
+    "oa_date": "2026-10-01",
+    "pmh_id": null,
+    "repository_institution": null,
+    "updated": "deprecated",
+    "url": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/jpc.70611",
+    "url_for_landing_page": "https://doi.org/10.1111/jpc.70611",
+    "url_for_pdf": "https://onlinelibrary.wiley.com/doi/pdfdirect/10.1111/jpc.70611",
+    "version": "publishedVersion"
+   }
+  ],
+  "oa_locations_embargoed": [],
+  "oa_status": "hybrid",
+  "published_date": "2026-10-01",
+  "publisher": "Wiley",
+  "title": "Systemic Factors Associated With Paediatric Dental General Anaesthesia Utilisation in Aotearoa New Zealand: A Scoping Review",
+  "updated": "2026-10-04T09:52:32Z",
+  "year": 2026,
+  "z_authors": [
+   {
+    "author_position": "first",
+    "is_corresponding": true,
+    "raw_affiliation_strings": [
+     "Dental Public Health Specialist (Retired) Tāmaki Makaurau Auckland  Auckland Aotearoa New Zealand"
+    ],
+    "raw_author_name": "Sathananthan Kanagaratnam"
+   },
+   {
+    "author_position": "last",
+    "is_corresponding": true,
+    "raw_affiliation_strings": [
+     "General Practice Clinical Unit, Faculty of Medicine The University of Queensland  Brisbane Queensland Australia",
+     "Te Kaupeka Oranga Faculty of Health Te Whare Wananga o Waitaha University of Canterbury  Ōtautah Christchurch Aotearoa New Zealand"
+    ],
+    "raw_author_name": "Philip J. Schlüter"
+   }
+  ]
+ }
+}

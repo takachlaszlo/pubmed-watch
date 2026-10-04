@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from .http import HttpClient
 
@@ -18,10 +18,13 @@ UNPAYWALL = "https://api.unpaywall.org/v2/"
 EPMC_BATCH = 100
 # PMC Article Datasets on AWS Open Data: public bucket meant for machine access, one prefix per article version
 PMC_BUCKET = "https://pmc-oa-opendata.s3.amazonaws.com"
-# lower rank = preferred. Only the first two can be fetched by a script (Europe PMC's web PDF sits behind a
-# browser check that must not be bypassed, so it stays a link for people)
-PDF_SOURCE_RANK = {"pmc-s3": 0, "unpaywall": 1, "europepmc": 2, "": 9}
+# lower rank = preferred. Only the first two can be fetched by a script. The others are links for people: Europe
+# PMC's web PDF and many publisher PDFs sit behind a browser check that must not be bypassed.
+PDF_SOURCE_RANK = {"pmc-s3": 0, "unpaywall": 1, "europepmc": 2, "unpaywall-web": 3, "": 9}
 AUTO_DOWNLOAD_SOURCES = ("pmc-s3", "unpaywall")
+# Unpaywall often lists these as extra copies; they are the browser-gated Europe PMC / PMC pages we already link
+GATED_HOSTS = ("europepmc.org", "ncbi.nlm.nih.gov")
+MAX_PROBES_PER_ARTICLE = 3
 
 
 @dataclass
@@ -63,14 +66,34 @@ def europepmc_links(http: HttpClient, pmids: list[str]) -> dict[str, OaLinks]:
     return found
 
 
-def parse_unpaywall(data: dict) -> OaLinks:
+def _gated(url: str) -> bool:
+    host = urlsplit(url).hostname or ""
+    return host.endswith(GATED_HOSTS)
+
+
+def parse_unpaywall(data: dict) -> tuple[OaLinks, list[str]]:
+    """(links, PDF candidates). Candidates: best location first, then the others, minus the gated Europe PMC/PMC
+    pages. `links.url_pdf` is the first candidate; whether a script may fetch it is decided by `unpaywall_links`."""
     best = data.get("best_oa_location") or {}
-    return OaLinks(oa=bool(data.get("is_oa")), url_fulltext=best.get("url_for_landing_page") or "",
-                   url_pdf=best.get("url_for_pdf") or "", pdf_source="unpaywall" if best.get("url_for_pdf") else "")
+    locations = [best] + [loc for loc in data.get("oa_locations") or [] if loc != best]
+    candidates: list[str] = []
+    for loc in locations:
+        url = loc.get("url_for_pdf") or ""
+        if url and not _gated(url) and url not in candidates:
+            candidates.append(url)
+    landing = best.get("url_for_landing_page") or best.get("url") or ""
+    links = OaLinks(oa=bool(data.get("is_oa")), url_fulltext="" if _gated(landing) else landing,
+                    url_pdf=candidates[0] if candidates else "", pdf_source="unpaywall" if candidates else "")
+    return links, candidates
 
 
-def unpaywall_links(http: HttpClient, dois: dict[str, str], email: str) -> dict[str, OaLinks]:
-    """dois: pmid -> DOI. Unpaywall asks for a contact e-mail with every request."""
+def unpaywall_links(http: HttpClient, dois: dict[str, str], email: str,
+                    known_pdf: dict[str, str] | None = None) -> dict[str, OaLinks]:
+    """dois: pmid -> DOI. Unpaywall asks for a contact e-mail with every request.
+
+    Each new PDF candidate is tried once: if it really returns a PDF it is marked `unpaywall` (scripts may download
+    it), otherwise `unpaywall-web` (a link for people only; we never work around a refusal)."""
+    known_pdf = known_pdf or {}
     found: dict[str, OaLinks] = {}
     for pmid, doi in dois.items():
         try:
@@ -78,9 +101,19 @@ def unpaywall_links(http: HttpClient, dois: dict[str, str], email: str) -> dict[
         except Exception as exc:
             log.debug("Unpaywall: nincs adat (%s): %s", doi, exc)
             continue
-        links = parse_unpaywall(data)
-        if links.oa:
-            found[pmid] = links
+        links, candidates = parse_unpaywall(data)
+        if not links.oa:
+            continue
+        if candidates and known_pdf.get(pmid) in candidates:
+            links.url_pdf, links.pdf_source = "", ""  # stored and classified earlier: no new probe
+        elif candidates:
+            links.pdf_source = "unpaywall-web"
+            for url in candidates[:MAX_PROBES_PER_ARTICLE]:
+                status, head = http.probe(url)
+                if status == 200 and head.startswith(b"%PDF"):
+                    links.url_pdf, links.pdf_source = url, "unpaywall"
+                    break
+        found[pmid] = links
     return found
 
 

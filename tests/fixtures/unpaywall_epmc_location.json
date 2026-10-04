@@ -1,0 +1,139 @@
+{
+ "doi": "10.3390/s26185823",
+ "response": {
+  "best_oa_location": {
+   "endpoint_id": null,
+   "evidence": "deprecated",
+   "host_type": "publisher",
+   "is_best": true,
+   "license": "cc-by",
+   "oa_date": "2026-09-14",
+   "pmh_id": null,
+   "repository_institution": null,
+   "updated": "deprecated",
+   "url": "https://doi.org/10.3390/s26185823",
+   "url_for_landing_page": "https://doi.org/10.3390/s26185823",
+   "url_for_pdf": null,
+   "version": "publishedVersion"
+  },
+  "data_standard": 2,
+  "doi": "10.3390/s26185823",
+  "doi_url": "https://doi.org/10.3390/s26185823",
+  "first_oa_location": {
+   "endpoint_id": null,
+   "evidence": "deprecated",
+   "host_type": "publisher",
+   "is_best": true,
+   "license": "cc-by",
+   "oa_date": "2026-09-14",
+   "pmh_id": null,
+   "repository_institution": null,
+   "updated": "deprecated",
+   "url": "https://doi.org/10.3390/s26185823",
+   "url_for_landing_page": "https://doi.org/10.3390/s26185823",
+   "url_for_pdf": null,
+   "version": "publishedVersion"
+  },
+  "genre": "journal-article",
+  "has_repository_copy": true,
+  "is_oa": true,
+  "is_paratext": false,
+  "journal_is_in_doaj": true,
+  "journal_is_oa": true,
+  "journal_issn_l": "1424-8220",
+  "journal_issns": "1424-8220",
+  "journal_name": "Sensors",
+  "oa_locations": [
+   {
+    "endpoint_id": null,
+    "evidence": "deprecated",
+    "host_type": "publisher",
+    "is_best": true,
+    "license": "cc-by",
+    "oa_date": "2026-09-14",
+    "pmh_id": null,
+    "repository_institution": null,
+    "updated": "deprecated",
+    "url": "https://doi.org/10.3390/s26185823",
+    "url_for_landing_page": "https://doi.org/10.3390/s26185823",
+    "url_for_pdf": null,
+    "version": "publishedVersion"
+   },
+   {
+    "endpoint_id": "ac9de7698155b820de7",
+    "evidence": "deprecated",
+    "host_type": "repository",
+    "is_best": false,
+    "license": "cc-by",
+    "oa_date": "2026-09-14",
+    "pmh_id": "oai:pubmedcentral.nih.gov:13611101",
+    "repository_institution": "National Institutes of Health",
+    "updated": "deprecated",
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13611101/pdf/sensors-26-05823.pdf",
+    "url_for_landing_page": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13611101/",
+    "url_for_pdf": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13611101/pdf/sensors-26-05823.pdf",
+    "version": "submittedVersion"
+   }
+  ],
+  "oa_locations_embargoed": [],
+  "oa_status": "gold",
+  "published_date": "2026-09-14",
+  "publisher": "MDPI AG",
+  "title": "Automated Vision-Based Sensing of Paediatric Pain Using 2D-Facial Landmark Trajectories Derived from 3D Geometric Normalisation and a Spatial-Temporal Attention Long Short-Term Memory (STA-LSTM) Network",
+  "updated": "2026-09-29T14:24:08Z",
+  "year": 2026,
+  "z_authors": [
+   {
+    "author_position": "first",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Department of Paediatric Anaesthesia, KK Women’s and Children’s Hospital, Singapore 229899, Singapore"
+    ],
+    "raw_author_name": "Teddy Fabila"
+   },
+   {
+    "author_position": "middle",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Biomedical Engineering and Materials Group, Nanyang Polytechnic, Singapore 569830, Singapore"
+    ],
+    "raw_author_name": "Tiehua Du"
+   },
+   {
+    "author_position": "middle",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Department of Women’s Anaesthesia, KK Women’s and Children’s Hospital, Singapore 229899, Singapore",
+     "Duke-NUS Medical School, Singapore 169857, Singapore"
+    ],
+    "raw_author_name": "Chin Wen Tan"
+   },
+   {
+    "author_position": "middle",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Department of Women’s Anaesthesia, KK Women’s and Children’s Hospital, Singapore 229899, Singapore"
+    ],
+    "raw_author_name": "Rehena Sultana"
+   },
+   {
+    "author_position": "middle",
+    "is_corresponding": true,
+    "raw_affiliation_strings": [
+     "Department of Paediatric Anaesthesia, KK Women’s and Children’s Hospital, Singapore 229899, Singapore",
+     "Duke-NUS Medical School, Singapore 169857, Singapore"
+    ],
+    "raw_author_name": "Choon Looi Bong"
+   },
+   {
+    "author_position": "last",
+    "is_corresponding": false,
+    "raw_affiliation_strings": [
+     "Department of Women’s Anaesthesia, KK Women’s and Children’s Hospital, Singapore 229899, Singapore",
+     "Duke-NUS Medical School, Singapore 169857, Singapore"
+    ],
+    "raw_author_name": "Ban Leong Sng"
+   }
+  ]
+ }
+}

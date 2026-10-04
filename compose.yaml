@@ -47,8 +47,8 @@ services:
       # ingyenes NCBI API-kulcs (gyorsabb lekérdezés); nélküle is működik
       NCBI_API_KEY: ""
       NCBI_EMAIL: ""
-      # Unpaywall: további szabad PDF-linkek a kiadói oldalakról; egy kapcsolattartó
-      # e-mail-cím kell hozzá (az Unpaywall szabálya), üresen hagyva kikapcsolva
+      # Unpaywall: további szabad PDF-linkek és kiadói teljes szövegek; egy kapcsolattartó e-mail-cím
+      # kell hozzá (az Unpaywall szabálya), üresen hagyva kikapcsolva. Ide a saját címedet írd, ne a repóba.
       UNPAYWALL_EMAIL: ""
 
     extra_hosts:

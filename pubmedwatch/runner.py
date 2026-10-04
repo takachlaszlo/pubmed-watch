@@ -56,21 +56,23 @@ def enrich_links(storage: Storage, http: HttpClient, cfg: Config, today: date, f
     if not pending:
         return 0
     changed = 0
-    found = europepmc_links(http, [p for p, _, _ in pending])
+    found = europepmc_links(http, [p for p, _, _, _ in pending])
     for pmid, links in found.items():
         changed += storage.update_oa(pmid, links)
     pmcids = {pmid: (found[pmid].pmcid if pmid in found and found[pmid].pmcid else pmcid)
-              for pmid, _, pmcid in pending}
+              for pmid, _, pmcid, _ in pending}
     s3 = pmc_s3_links(http, {pmid: pmcid for pmid, pmcid in pmcids.items() if pmcid})
     for pmid, links in s3.items():
         changed += storage.update_oa(pmid, links)
     if cfg.sources.unpaywall_email:
-        missing = {p: doi for p, doi, _ in pending if doi and p not in s3}
-        for pmid, links in unpaywall_links(http, missing, cfg.sources.unpaywall_email).items():
+        missing = {p: doi for p, doi, _, _ in pending if doi and p not in s3}
+        known_pdf = {p: url for p, _, _, url in pending if url}
+        for pmid, links in unpaywall_links(http, missing, cfg.sources.unpaywall_email, known_pdf).items():
             changed += storage.update_oa(pmid, links)
-    storage.mark_oa_checked(p for p, _, _ in pending)
+    storage.mark_oa_checked(p for p, _, _, _ in pending)
     storage.commit()
-    log.info("OA-linkek: %d cikk ellenőrizve, ebből PMC S3: %d, frissült: %d", len(pending), len(s3), changed)
+    log.info("OA-linkek: %d cikk ellenőrizve, ebből PMC S3: %d%s, frissült: %d", len(pending), len(s3),
+             ", Unpaywall is" if cfg.sources.unpaywall_email else "", changed)
     return changed
 
 
