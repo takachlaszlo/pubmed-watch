@@ -10,6 +10,7 @@ from . import mailer
 from .classify import classify, section_of
 from .clinicaltrials import new_trials
 from .config import Config
+from .downloads import organize_all
 from .http import HttpClient
 from .openaccess import europepmc_links, pmc_s3_links, unpaywall_links
 from .pubmed import PubMed
@@ -76,11 +77,39 @@ def enrich_links(storage: Storage, http: HttpClient, cfg: Config, today: date, f
     return changed
 
 
-def refresh_links(cfg: Config, http: HttpClient | None = None, today: date | None = None) -> int:
-    """Link refresh on its own (used at container start, so a new link source applies without waiting a day)."""
+def refresh_bibliography(storage: Storage, pubmed: PubMed, today: date, limit: int = 400) -> int:
+    """Re-reads volume/issue (and dates) from PubMed for articles that have none yet. PubMed assigns the issue
+    weeks after the online-first publication; the PDF folder name uses what is known at download time."""
+    pmids = storage.pending_bibliography(today.isoformat(), limit)
+    if not pmids:
+        return 0
+    changed = 0
+    seen: set[str] = set()
+    for article in pubmed.fetch(pmids):
+        seen.add(article.pmid)
+        storage.update_bibliography(article)
+        changed += 1 if (article.volume or article.issue) else 0
+    storage.mark_bibliography_checked(set(pmids) - seen)  # withdrawn / unavailable: do not ask again every day
+    storage.commit()
+    log.info("kiadványadatok: %d cikk újraolvasva, ebből kötet/szám ismert: %d", len(pmids), changed)
+    return changed
+
+
+def refresh_links(cfg: Config, http: HttpClient | None = None, today: date | None = None,
+                  force: bool = False) -> int:
+    """Link refresh on its own. `force` ignores the back-off schedule (used once after adding a link source)."""
     storage = Storage(cfg.data_dir)
     try:
-        return enrich_links(storage, http or make_http(cfg), cfg, today or date.today(), force=True)
+        return enrich_links(storage, http or make_http(cfg), cfg, today or date.today(), force=force)
+    finally:
+        storage.close()
+
+
+def refresh_bibliography_job(cfg: Config, http: HttpClient | None = None, today: date | None = None) -> int:
+    storage = Storage(cfg.data_dir)
+    try:
+        pubmed = PubMed(http or make_http(cfg), cfg.sources.ncbi_api_key, cfg.sources.ncbi_email)
+        return refresh_bibliography(storage, pubmed, today or date.today())
     finally:
         storage.close()
 
@@ -147,6 +176,12 @@ def run_once(cfg: Config, send_mail: bool = True, today: date | None = None, htt
         log.info("új cikk: %d (ismert: %d)", len(articles), len(known))
 
         enrich_links(storage, http, cfg, today)
+        try:
+            refresh_bibliography(storage, pubmed, today)
+            # an issue assigned meanwhile may mean a better folder for a PDF filed as online-first
+            organize_all(storage, cfg.api.pdf_dir, cfg.downloads.folders, cfg.downloads.inbox)
+        except Exception:  # citation details are not worth failing the day for
+            log.exception("a kiadványadatok frissítése / a PDF-ek rendezése sikertelen")
 
         trial_count = 0
         if cfg.trials.enabled:

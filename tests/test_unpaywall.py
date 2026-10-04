@@ -71,7 +71,7 @@ def test_runner_uses_unpaywall_and_s3_still_wins(cfg, monkeypatch):
     storage.db.execute("UPDATE articles SET pdf_source='unpaywall-web' WHERE pmid='42825830'")  # pretend it was link-only
     storage.commit(); storage.close()
     http2 = FakeHttp(cfg, s3_pmcids=(pmcid,), europepmc={"resultList": {"result": []}})
-    runner.refresh_links(cfg, http=http2, today=DAY)
+    runner.refresh_links(cfg, http=http2, today=DAY, force=True)
     storage = Storage(cfg.data_dir)
     assert storage.article("42825830")["pdf_source"] == "pmc-s3"
     storage.close()
@@ -91,20 +91,22 @@ def test_link_only_sources_are_not_selected_for_download(cfg, monkeypatch):
 
 
 def test_pending_back_off(cfg):
+    """Rechecks: daily for the first 7 days, weekly up to 30 days, then monthly, for a year."""
     storage = Storage(cfg.data_dir)
-    run = storage.start_run("2026-09-01", "2026-10-04", False)
+    run = storage.start_run("2026-01-01", "2026-10-04", False)
     today = date(2026, 10, 4)
-    cases = {  # pmid: (first seen days ago, last checked days ago or None)
-        "1": (2, None), "2": (2, 1), "3": (2, 0), "4": (12, 1), "5": (12, 6), "6": (12, 9), "7": (40, 9)}
-    for pmid, (seen, checked) in cases.items():
+    cases = {  # pmid: (age in days, days since the last check or None)
+        "1": (2, None), "2": (2, 1), "3": (2, 0), "4": (12, 6), "5": (12, 7), "6": (40, 29), "7": (40, 30),
+        "8": (200, 31), "9": (200, 10), "10": (400, None)}
+    for pmid, (age, checked) in cases.items():
         storage.insert_article(Article(pmid=pmid, title=pmid), "innovacio", run)
-        first = (today - timedelta(days=seen)).isoformat() + "T08:00:00+02:00"
+        first = (today - timedelta(days=age)).isoformat() + "T08:00:00+02:00"
         last = (today - timedelta(days=checked)).isoformat() + "T08:00:00+02:00" if checked is not None else ""
         storage.db.execute("UPDATE articles SET first_seen_at=?, oa_checked_at=? WHERE pmid=?", (first, last, pmid))
     storage.commit()
-    since = (today - timedelta(days=30)).isoformat()
+    since = (today - timedelta(days=365)).isoformat()
     due = {p for p, *_ in storage.pending_oa(since, today.isoformat())}
-    # fresh articles daily (not if already checked today); older ones about weekly; beyond 30 days never
-    assert due == {"1", "2", "5", "6"}
-    assert {p for p, *_ in storage.pending_oa(since, today.isoformat(), force=True)} == {"1", "2", "3", "4", "5", "6"}
+    assert due == {"1", "2", "5", "7", "8"}  # the 400-day-old one is past the year
+    forced = {p for p, *_ in storage.pending_oa(since, today.isoformat(), force=True)}
+    assert forced == {"1", "2", "3", "4", "5", "6", "7", "8", "9"}
     storage.close()

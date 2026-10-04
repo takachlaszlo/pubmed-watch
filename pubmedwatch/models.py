@@ -22,6 +22,8 @@ class Article:
     doi: str = ""
     pmcid: str = ""
     publication_status: str = ""  # aheadofprint | epublish | ppublish ...
+    volume: str = ""  # empty while the article is online ahead of print
+    issue: str = ""
     # derived
     kind: str = "other"  # guideline | systematic_review | protocol | rct | review | other
     is_update: bool = False

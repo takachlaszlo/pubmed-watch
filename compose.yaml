@@ -33,6 +33,11 @@ services:
       # egyszeri összesítő levél az adatbázisból az utolsó N napról (0 = ki). Minden értéknél csak egyszer
       # küld; újabb küldéshez írj be másik számot.
       DIGEST_ON_START_DAYS: "0"
+      # a PDF-mappa, ahogy ez a konténer látja (lent a volumes-ban); innen ismeri fel a már letöltött fájlokat,
+      # és ide rendezi a PDF-eket folyóirat/issue mappákba
+      PDF_DIR: "/pdfs"
+      # új érték = egyszeri teljes PDF-link frissítés indításkor (pl. új forrás bevezetése után)
+      LINK_REFRESH_ON_START: ""
       PUBMEDWATCH_CONFIG: "/app/config/config.yaml"
       PUBMEDWATCH_DATA: "/data"
 
@@ -59,6 +64,8 @@ services:
 
     volumes:
       - ./data:/data   # SQLite adatbázis (pubmed.db), napló, utolsó jelentés
+      # az n8n "shared" mappájának PDF-része: az n8n ide ment, a figyelő innen rendez (írható kell legyen)
+      - /volume1/docker/n8n/shared/pubmed-pdf:/pdfs
 
     command:
       - /bin/sh

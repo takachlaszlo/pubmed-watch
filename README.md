@@ -42,20 +42,23 @@ a `http://192.168.1.168:8765` címen:
 | Végpont | Tartalom |
 |---------|----------|
 | `GET /health` | állapot, darabszámok, utolsó sikeres futás |
-| `GET /articles` | cikkek; szűrők: `run_id`, `since`, `updated_since` (ISO dátum), `topic`, `section`, `kind`, `has_pdf=true/false`, `limit` (max. 1000), `offset` |
+| `GET /articles` | cikkek; szűrők: `run_id`, `since`, `updated_since` (ISO dátum), `topic`, `section`, `kind`, `has_pdf=true/false`, `pdf_source`, `limit` (max. 1000), `offset` |
 | `GET /articles/{pmid}` | egy cikk |
 | `GET /trials` | vizsgálatok; szűrők: `run_id`, `since`, `status`, `limit`, `offset` |
 | `GET /trials/{nct_id}` | egy vizsgálat |
 | `GET /runs`, `GET /runs/latest` | futások története |
 | `GET /topics` | témák (kifejtett lekérdezéssel) és szekciók |
 | `GET /reports/latest` | az utolsó levél HTML-ben |
+| `GET /downloads/due` | amit az n8n most letölthet (lásd lent); szűrő: `hours` (alapból 24) |
+| `GET /downloads` | a letöltési nyilvántartás; szűrő: `status=ok/failed` |
+| `POST /downloads/report` | az n8n jelenti egy letöltés eredményét (az API egyetlen írási művelete) |
 
 Egy cikk rekordja (rövidítve):
 
 ```json
 {
   "pmid": "42814651", "title": "...", "journal": "...", "journal_abbrev": "JMIR Res Protoc",
-  "pub_year": "2026", "entrez_date": "2026-09-30", "doi": "10.2196/...", "pmcid": "PMC13626073",
+  "pub_year": "2026", "volume": "15", "issue": "", "entrez_date": "2026-09-30", "doi": "10.2196/...", "pmcid": "PMC13626073",
   "kind": "protocol", "is_update": false, "section": "vizsgalatok", "topics": ["protokoll"],
   "abstract": [{"label": "BACKGROUND", "text": "..."}], "authors": ["..."], "mesh": [], "pub_types": ["..."],
   "oa": true, "pdf_source": "europepmc",
@@ -84,19 +87,44 @@ szerint a cikk nyílt hozzáférésű, de csak a kiadó HTML-oldala van meg, az 
 
 Az `/articles` rekord `pdf_source` mezője megmondja, melyik forrásról van szó, szűrni is lehet rá
 (`?pdf_source=pmc-s3`). A PMC-másolat gyakran csak napokkal a megjelenés után kerül a tárolóba, ezért a napi
-futás 30 napig újra ellenőrzi azokat, amelyeknek még nincs `pmc-s3` vagy `unpaywall` linkjük: az első 7 napban
-naponta, utána hetente (hogy az Unpaywallt se terheljük fölöslegesen). Ha jobb forrást talál, az `updated_at`
-mező frissül, így az n8n az `/articles?updated_since=...` lekérdezéssel megkapja az utólag letölthetővé
+futás újra ellenőrzi azokat, amelyeknek még nincs `pmc-s3` vagy `unpaywall` linkjük: az első 7 napban naponta,
+30 napig hetente, utána havonta, egy évig (hogy az Unpaywallt se terheljük fölöslegesen, és a fél-egy év után
+megnyíló cikkek is előkerüljenek). Ha jobb forrást talál, az `updated_at` mező frissül, így az n8n az `/articles?updated_since=...` lekérdezéssel megkapja az utólag letölthetővé
 váltakat. Fizetős cikkekhez csak PubMed/DOI link van.
 
-**Kész n8n-workflow: [`n8n/pubmed-pdf-letoltes.workflow.json`](n8n/pubmed-pdf-letoltes.workflow.json)**
-Naponta 07:00-kor (a figyelő 06:30-as futása után) lekéri az API-ból az utolsó sikeres feldolgozás óta
-újonnan megjelent vagy PDF-linket kapott cikkeket (`updated_since` + `has_pdf=true`), a szabályok
-szerint kiválasztja a letöltendőket (csak `pmc-s3`/`unpaywall` forrásból, 3 próbálkozással; a `*-web` linkek csak a levélben vannak), letölti a PDF-eket, és az n8n `shared/pubmed-pdf/<szekció>/` mappájába
-menti (`ÉV-PMID-cím.pdf`). A szelekciós szabályok (szekciók, cikktípusok) a „Szelekció” Code node
-tetején vannak. Alapból: irányelvek, gyermek-AMS, gyermekinfektológia. Importálás: n8n → Workflows →
-Import from File, majd Active. A cél mappákat (`shared/pubmed-pdf/iranyelvek`, `gyermek-ams`,
-`gyermekinfektologia`) előre létre kell hozni.
+### PDF-letöltés (n8n) és nyilvántartás
+
+A „mi töltődött le, mi nem” a figyelő adatbázisában van (`downloads` tábla), nem az n8n memóriájában, így
+túléli a workflow újraimportálását és a kézi próbafutásokat is. Az n8n a figyelőtől kérdezi meg, mit töltsön le,
+és ide jelent vissza. Szabályok:
+
+- **Csak az elmúlt 24 óra.** A `GET /downloads/due` csak azokat a program által letölthető (`pmc-s3`/`unpaywall`)
+  cikkeket ajánlja fel, amelyek az elmúlt 24 órában jelentek meg vagy kaptak PDF-linket (`downloads.window_hours`).
+- **Ami megvan, azt nem tölti le újra.** Három védelem van: (1) a 24 órás ablak, (2) a nyilvántartás: a sikeres
+  letöltés végleges, és a későn érkező hibajelentés sem írhatja felül, (3) lemezellenőrzés: ami a PDF-mappában már
+  ott van (a fájlnév tartalmazza a PMID-t, bárhol a mappafában), azt letöltöttnek veszi, akkor is, ha az n8n nem
+  jelentett vissza.
+- **Ami nem sikerült, azt havonta újrapróbálja, egy évig.** A hibás letöltést a figyelő 30 nap múlva ajánlja fel újra,
+  az első próbálkozástól számított 365 napig (`retry_every_days`, `retry_for_days`). Ha közben a PDF-link megváltozott
+  (új forrás), nem várja meg a hónapot. A mentési hibát (az n8n nem tudott írni a mappába) holnap újrapróbálja, mert az
+  a mi oldalunk hibája, nem a cikké.
+- **Mappák: folyóirat, azon belül issue.** `Pediatr Infect Dis J/2026_vol-45_issue-10/2026-<pmid>-<cím>.pdf`
+  (`downloads.folders`: `section`, `journal`, `issue`, `year` kombinálható). Az issue-t a PubMed kötet/szám adata adja;
+  az online először megjelent, még issue nélküli cikk az `2026_online-first` mappába kerül, és áthelyezésre kerül a
+  helyes issue-mappába, amint a PubMed kiadja az issue-t (csak akkor, ha a fájl még ott van, ahová tettük, a te
+  kézzel máshová tett fájljaidhoz nem nyúl).
+
+Az n8n nem tud mappát létrehozni, ezért minden PDF az `_inbox` mappába kerül, és a figyelő a jelentés után teszi át
+a végleges mappába (sosem ír felül fájlt, és a PDF-mappán kívülre nem nyúl). A figyelő konténerének ehhez írható
+módon kell látnia ugyanazt a mappát (`/volume1/docker/n8n/shared/pubmed-pdf:/pdfs`, lásd a compose-ot).
+
+**Kész n8n-workflow: [`n8n/pubmed-pdf-letoltes.workflow.json`](n8n/pubmed-pdf-letoltes.workflow.json).**
+Naponta 07:00-kor (a figyelő 06:30-as futása után): `GET /downloads/due?hours=24`, a „Szelekció” Code node
+kiválasztja a letöltendőket (alapból az irányelvek, a gyermek-AMS és a gyermekinfektológia szekció; a szabályok a
+node tetején szerkeszthetők), letölti a PDF-eket (3 próbálkozással), az `_inbox` mappába menti, és minden eredményt
+jelent (`ok`, letöltési hiba, mentési hiba). Importálás: n8n → Workflows → Import from File, majd Publish. A régi
+változatot előbb vond vissza (Unpublish/Archive), különben mindkettő lefut. Az `_inbox` mappát (`shared/pubmed-pdf/_inbox`)
+előre létre kell hozni, és az n8n-nek írnia kell tudnia bele.
 
 Egyéb minta: a compose-ban az `N8N_WEBHOOK_URL`-t egy n8n Webhook node URL-jére állítva minden futás után
 POST érkezik `{event, run_id, window, counts, articles[], trials[]}` tartalommal.
@@ -106,7 +134,8 @@ POST érkezik `{event, run_id, window, counts, articles[], trials[]}` tartalomma
 1. `\\Becalel\docker\pubmed-watch\` mappa, benne a [`compose.yaml`](compose.yaml) és egy üres `data` mappa.
 2. Container Manager → Projekt → Létrehozás → név: `pubmed-watch`, útvonal: `/volume1/docker/pubmed-watch`.
 3. A compose-ban írd be az `SMTP_PASSWORD` értékét. Opcionálisan: `API_TOKEN`, `N8N_WEBHOOK_URL`,
-   `NCBI_API_KEY`, `UNPAYWALL_EMAIL`.
+   `NCBI_API_KEY`, `UNPAYWALL_EMAIL`. Egyszeri műveletek: `DIGEST_ON_START_DAYS` (összesítő levél),
+   `LINK_REFRESH_ON_START` (új érték = egyszeri teljes PDF-link frissítés, pl. új forrás bevezetése után).
 4. Indítás. Az első próbához átmenetileg `RUN_ON_START: "true"`.
 
 A program induláskor a GitHubról tölti le magát. Kód- vagy config-változás után: push a `main` ágra,
@@ -120,6 +149,8 @@ python -m pytest                                   # offline tesztek, valódi Pu
 PUBMEDWATCH_DATA=./data python -m pubmedwatch counts --days 30   # témánkénti napi átlag
 PUBMEDWATCH_DATA=./data python -m pubmedwatch run --no-mail      # egy futás levél nélkül
 PUBMEDWATCH_DATA=./data python -m pubmedwatch serve              # csak az API
+PUBMEDWATCH_DATA=./data python -m pubmedwatch refresh-bibliography  # kötet/szám a PubMedből
+PUBMEDWATCH_DATA=./data PDF_DIR=./pdfs python -m pubmedwatch organize  # PDF-ek mappákba rendezése
 ```
 
 Források: NCBI E-utilities, Europe PMC REST API, ClinicalTrials.gov API v2, opcionálisan Unpaywall.

@@ -116,6 +116,8 @@ def parse_article(node: ET.Element) -> Article | None:
         doi=ids.get("doi", ""),
         pmcid=ids.get("pmc", ""),
         publication_status=node.findtext("PubmedData/PublicationStatus") or "",
+        volume=_text(journal.find("JournalIssue/Volume")) if journal is not None else "",
+        issue=_text(journal.find("JournalIssue/Issue")) if journal is not None else "",
     )
 
 

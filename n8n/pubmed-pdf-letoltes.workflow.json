@@ -14,7 +14,7 @@
           ]
         }
       },
-      "id": "a1000000-0000-4000-8000-000000000001",
+      "id": "a2000000-0000-4000-8000-000000000001",
       "name": "Naponta 07:00",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
@@ -25,34 +25,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// Az utolsó sikeres feldolgozás óta módosult cikkeket kérjük le (a workflow \"static data\"-jában tárolt időpont).\n// Az első futás az elmúlt 3 napot nézi.\nconst sd = $getWorkflowStaticData('global');\nconst since = sd.lastRun || new Date(Date.now() - 3 * 86400e3).toISOString();\nreturn [{ json: { since, startedAt: new Date().toISOString() } }];"
-      },
-      "id": "a1000000-0000-4000-8000-000000000002",
-      "name": "Időablak",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        220,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "url": "http://192.168.1.168:8765/articles",
+        "url": "http://192.168.1.168:8765/downloads/due",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
             {
-              "name": "updated_since",
-              "value": "={{ $json.since }}"
-            },
-            {
-              "name": "has_pdf",
-              "value": "true"
-            },
-            {
-              "name": "limit",
-              "value": "1000"
+              "name": "hours",
+              "value": "24"
             }
           ]
         },
@@ -60,60 +39,26 @@
           "timeout": 60000
         }
       },
-      "id": "a1000000-0000-4000-8000-000000000003",
-      "name": "Új és frissült cikkek (API)",
+      "id": "a2000000-0000-4000-8000-000000000002",
+      "name": "Letöltendő cikkek (API)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        440,
+        220,
         0
       ]
     },
     {
       "parameters": {
-        "jsCode": "// === SZELEKCIÓS SZABÁLYOK – itt módosíthatók ===\n// Melyik levélszekciók PDF-jét töltsük le automatikusan?\n//   iranyelvek | gyermek-ams | gyermekinfektologia | review-gyermek | review-infektologia | innovacio | vizsgalatok\n// (Új szekcióhoz előbb hozd létre a mappát: n8n/shared/pubmed-pdf/<szekció>)\nconst SECTIONS = ['iranyelvek', 'gyermek-ams', 'gyermekinfektologia'];\n// Opcionális további feltétel a cikktípusra (pl. ['guideline','systematic_review']); üres = bármi.\nconst KINDS = [];\n// Csak olyan forrásból töltünk le, amelyet program is elérhet (a Europe PMC webes PDF-je böngészőellenőrzés mögött van,\n// az a levélben kattintható link marad).\nconst SOURCES = ['pmc-s3', 'unpaywall'];\n// ==============================================\n\nconst slug = (s) => (s || '')\n  .normalize('NFKD').replace(/[\\u0300-\\u036f]/g, '')\n  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70).replace(/-+$/, '');\n\nconst out = [];\n$input.all().forEach((item, i) => {\n  const a = item.json;\n  if (!a || !a.pmid || !a.links || !a.links.pdf) return;\n  if (!SECTIONS.includes(a.section)) return;\n  if (!SOURCES.includes(a.pdf_source)) return;\n  if (KINDS.length && !KINDS.includes(a.kind)) return;\n  const file = `${a.pub_year || 'xxxx'}-${a.pmid}-${slug(a.title)}.pdf`;\n  out.push({ json: { pmid: a.pmid, section: a.section, title: a.title, pdfUrl: a.links.pdf, path: `/files/pubmed-pdf/${a.section}/${file}` }, pairedItem: { item: i } });\n});\nreturn out;"
+        "jsCode": "// === SZELEKCIÓS SZABÁLYOK – itt módosíthatók ===\n// Melyik levélszekciók PDF-jét töltsük le automatikusan?\n//   iranyelvek | gyermek-ams | gyermekinfektologia | review-gyermek | review-infektologia | innovacio | vizsgalatok\nconst SECTIONS = ['iranyelvek', 'gyermek-ams', 'gyermekinfektologia'];\n// Opcionális további feltétel a cikktípusra (pl. ['guideline','systematic_review']); üres = bármi.\nconst KINDS = [];\n// Csak olyan forrásból töltünk le, amelyet program is elérhet. A Europe PMC webes PDF-je és a legtöbb kiadói\n// oldal böngészőellenőrzés mögött van, azok a levélben kattintható linkek maradnak.\nconst SOURCES = ['pmc-s3', 'unpaywall'];\n// A PDF-mappa az n8n konténerében (a compose-ban: ./shared:/files). A figyelő ugyanezt a mappát látja.\nconst ROOT = '/files/pubmed-pdf/';\n// ==============================================\n// Az n8n nem tud mappát létrehozni, ezért minden PDF az _inbox mappába kerül; a figyelő a jelentés után\n// a végleges folyóirat/issue mappába teszi át. A \"download\" mezőt a figyelő számolja (új cikk az elmúlt\n// 24 órából, vagy a havi újrapróbálás esedékes), a már letöltöttet sosem ajánlja fel újra.\n\nconst out = [];\n$input.all().forEach((item, i) => {\n  const a = item.json;\n  if (!a || !a.pmid || !a.links || !a.links.pdf || !a.download) return;\n  if (!SECTIONS.includes(a.section)) return;\n  if (KINDS.length && !KINDS.includes(a.kind)) return;\n  if (!SOURCES.includes(a.pdf_source)) return;\n  out.push({\n    json: { pmid: a.pmid, section: a.section, title: a.title, reason: a.download.reason, pdfUrl: a.links.pdf,\n            relpath: a.download.path, path: ROOT + a.download.path },\n    pairedItem: { item: i },\n  });\n});\nreturn out;"
       },
-      "id": "a1000000-0000-4000-8000-000000000004",
+      "id": "a2000000-0000-4000-8000-000000000003",
       "name": "Szelekció",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        660,
+        440,
         0
-      ],
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose"
-          },
-          "conditions": [
-            {
-              "id": "c1000000-0000-4000-8000-000000000001",
-              "leftValue": "={{ $json.pdfUrl }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "a1000000-0000-4000-8000-000000000005",
-      "name": "Van letöltendő?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        880,
-        -100
       ]
     },
     {
@@ -143,18 +88,18 @@
           }
         }
       },
-      "id": "a1000000-0000-4000-8000-000000000006",
+      "id": "a2000000-0000-4000-8000-000000000004",
       "name": "PDF letöltése",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
-        -200
+        660,
+        0
       ],
-      "onError": "continueRegularOutput",
       "retryOnFail": true,
       "maxTries": 3,
-      "waitBetweenTries": 3000
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -166,7 +111,7 @@
           },
           "conditions": [
             {
-              "id": "c1000000-0000-4000-8000-000000000002",
+              "id": "c2000000-0000-4000-8000-000000000001",
               "leftValue": "={{ !!$binary.data && ($binary.data.fileExtension === 'pdf' || String($binary.data.mimeType || '').includes('pdf')) }}",
               "rightValue": "",
               "operator": {
@@ -180,13 +125,13 @@
         },
         "options": {}
       },
-      "id": "a1000000-0000-4000-8000-000000000007",
+      "id": "a2000000-0000-4000-8000-000000000005",
       "name": "Tényleg PDF?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1320,
-        -200
+        880,
+        -80
       ]
     },
     {
@@ -196,28 +141,143 @@
         "dataPropertyName": "data",
         "options": {}
       },
-      "id": "a1000000-0000-4000-8000-000000000008",
+      "id": "a2000000-0000-4000-8000-000000000006",
       "name": "Mentés a NAS-ra",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
       "position": [
-        1540,
-        -300
-      ]
+        1100,
+        -160
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "jsCode": "// Az időablak csak akkor lép tovább, ha az egész lánc végigfutott (hibánál a következő futás újra megkapja ugyanazokat).\nconst sd = $getWorkflowStaticData('global');\nsd.lastRun = $('Időablak').first().json.startedAt;\nconst planned = $('Szelekció').all().filter(i => i.json.pdfUrl).length;\nlet saved = 0;\ntry { saved = $('Mentés a NAS-ra').all().length; } catch (e) { saved = 0; }\nreturn [{ json: { lastRun: sd.lastRun, tervezett: planned, mentve: saved, kihagyva: planned - saved } }];"
+        "method": "POST",
+        "url": "http://192.168.1.168:8765/downloads/report",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "pmid",
+              "value": "={{ $('Szelekció').item.json.pmid }}"
+            },
+            {
+              "name": "status",
+              "value": "ok"
+            },
+            {
+              "name": "path",
+              "value": "={{ $('Szelekció').item.json.relpath }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
       },
-      "id": "a1000000-0000-4000-8000-000000000009",
-      "name": "Lezárás",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "a2000000-0000-4000-8000-000000000007",
+      "name": "Jelentés: kész",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
-        880,
-        120
+        1320,
+        -220
       ],
-      "executeOnce": true
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.1.168:8765/downloads/report",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "pmid",
+              "value": "={{ $('Szelekció').item.json.pmid }}"
+            },
+            {
+              "name": "status",
+              "value": "failed"
+            },
+            {
+              "name": "stage",
+              "value": "download"
+            },
+            {
+              "name": "error",
+              "value": "={{ $json.error ? String($json.error.message || $json.error) : 'nem PDF (' + (($binary && $binary.data && $binary.data.mimeType) || 'ismeretlen') + ')' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "a2000000-0000-4000-8000-000000000008",
+      "name": "Jelentés: letöltési hiba",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        140
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://192.168.1.168:8765/downloads/report",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "pmid",
+              "value": "={{ $('Szelekció').item.json.pmid }}"
+            },
+            {
+              "name": "status",
+              "value": "failed"
+            },
+            {
+              "name": "stage",
+              "value": "save"
+            },
+            {
+              "name": "error",
+              "value": "={{ String($json.error || 'ismeretlen mentési hiba') }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "a2000000-0000-4000-8000-000000000009",
+      "name": "Jelentés: mentési hiba",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        -60
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -225,25 +285,14 @@
       "main": [
         [
           {
-            "node": "Időablak",
+            "node": "Letöltendő cikkek (API)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Időablak": {
-      "main": [
-        [
-          {
-            "node": "Új és frissült cikkek (API)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Új és frissült cikkek (API)": {
+    "Letöltendő cikkek (API)": {
       "main": [
         [
           {
@@ -258,28 +307,11 @@
       "main": [
         [
           {
-            "node": "Van letöltendő?",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Lezárás",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Van letöltendő?": {
-      "main": [
-        [
-          {
             "node": "PDF letöltése",
             "type": "main",
             "index": 0
           }
-        ],
-        []
+        ]
       ]
     },
     "PDF letöltése": {
@@ -287,6 +319,13 @@
         [
           {
             "node": "Tényleg PDF?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Jelentés: letöltési hiba",
             "type": "main",
             "index": 0
           }
@@ -302,7 +341,31 @@
             "index": 0
           }
         ],
-        []
+        [
+          {
+            "node": "Jelentés: letöltési hiba",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mentés a NAS-ra": {
+      "main": [
+        [
+          {
+            "node": "Jelentés: kész",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Jelentés: mentési hiba",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

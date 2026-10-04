@@ -1,4 +1,4 @@
-"""Read-only JSON API over the canonical database, for n8n's HTTP Request node.
+"""JSON API over the canonical database for n8n's HTTP Request node (read-only, except for the download report).
 
 GET /health                       service + database counts
 GET /topics                       topics and report sections from config.yaml
@@ -10,6 +10,12 @@ GET /articles/<pmid>
 GET /trials?...                   filters: run_id, since, status, limit, offset
 GET /trials/<nct_id>
 GET /reports/latest               the last e-mail digest as HTML
+GET /downloads/due?hours=         articles the n8n workflow should download now (see Storage.downloads_due);
+                                  each carries download.path, the relative PDF path to save to
+GET /downloads?status=            the download ledger (ok | failed)
+POST /downloads/report            {"pmid", "status": "ok"|"failed", "path", "error", "stage": "download"|"save"}:
+                                  n8n reports each attempt (a saved PDF is then filed into its journal/issue folder);
+                                  the only write the API accepts
 """
 from __future__ import annotations
 
@@ -17,15 +23,18 @@ import hmac
 import json
 import logging
 import threading
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 from .config import Config
+from .downloads import inbox_relpath, organize_all, pdf_relpath, safe_relpath, scan_pdf_dir
 from .storage import Storage
 
 log = logging.getLogger(__name__)
 
 MAX_LIMIT = 1000
+MAX_BODY = 65536
 
 
 class ApiError(Exception):
@@ -91,12 +100,54 @@ def handle(cfg: Config, storage: Storage, path: str, params: dict[str, str]) -> 
         if trial is None:
             raise ApiError(404, "nincs ilyen vizsgálat")
         return ok(trial)
+    if parts == ["downloads", "due"]:
+        now = datetime.now().astimezone()
+        storage.reconcile_downloads(scan_pdf_dir(cfg.api.pdf_dir), now)  # whatever is on disk is not offered again
+        organize_all(storage, cfg.api.pdf_dir, cfg.downloads.folders, cfg.downloads.inbox)  # strays in the inbox
+        hours = _int(params, "hours", cfg.downloads.window_hours, 24 * 400)
+        folders, inbox = cfg.downloads.folders, cfg.downloads.inbox
+        return ok(storage.downloads_due(
+            now, hours, cfg.downloads.retry_for_days,
+            lambda article: {"path": inbox_relpath(article, inbox), "final_path": pdf_relpath(article, folders)}))
+    if parts == ["downloads"]:
+        return ok(storage.downloads(params.get("status"), limit or 100, offset or 0))
     if parts == ["reports", "latest"]:
         report = cfg.data_dir / "last_report.html"
         if not report.exists():
             raise ApiError(404, "még nincs jelentés")
         return 200, "text/html; charset=utf-8", report.read_bytes()
     raise ApiError(404, "ismeretlen útvonal")
+
+
+def handle_post(cfg: Config, storage: Storage, path: str, payload: object) -> tuple[int, str, bytes]:
+    """The one write the API accepts: n8n reporting the outcome of a PDF download attempt."""
+    parts = [p for p in path.split("/") if p]
+    if parts != ["downloads", "report"]:
+        raise ApiError(404, "ismeretlen útvonal")
+    if not isinstance(payload, dict):
+        raise ApiError(400, "JSON objektum kell")
+    pmid = str(payload.get("pmid", "")).strip()
+    status = payload.get("status")
+    if not pmid.isdigit():
+        raise ApiError(400, "a pmid számokból álljon")
+    if status not in ("ok", "failed"):
+        raise ApiError(400, 'a status "ok" vagy "failed" legyen')
+    if not storage.has_article(pmid):
+        raise ApiError(404, "nincs ilyen cikk")
+    size = payload.get("bytes")
+    path = str(payload.get("path", "")).strip()[:300]
+    if status == "ok" and path and not safe_relpath(path):
+        raise ApiError(400, "a path a PDF-mappához képest relatív, .pdf végű útvonal legyen, '..' nélkül")
+    # a problem on our side (the folder is not writable) says nothing about the article: try again tomorrow
+    local = payload.get("stage") == "save"
+    row = storage.report_download(
+        pmid, status, datetime.now().astimezone(), cfg.downloads.retry_every_days, path=path,
+        size=size if isinstance(size, int) else None, error=str(payload.get("error", "")),
+        retry_in_days=1 if local else None)
+    if status == "ok":
+        organize_all(storage, cfg.api.pdf_dir, cfg.downloads.folders, cfg.downloads.inbox, only_pmid=pmid)
+        row = dict(storage.db.execute("SELECT * FROM downloads WHERE pmid=?", (pmid,)).fetchone())
+    return 200, "application/json; charset=utf-8", json.dumps(row, ensure_ascii=False).encode()
 
 
 def make_server(cfg: Config, host: str = "0.0.0.0") -> ThreadingHTTPServer:
@@ -117,6 +168,32 @@ def make_server(cfg: Config, host: str = "0.0.0.0") -> ThreadingHTTPServer:
                 body = json.dumps({"error": str(exc)}, ensure_ascii=False).encode()
             except Exception:
                 log.exception("API-hiba: %s", self.path)
+                status, ctype, body = 500, "application/json; charset=utf-8", b'{"error": "belso hiba"}'
+            self.send_response(status)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self) -> None:  # noqa: N802
+            url = urlsplit(self.path)
+            try:
+                if cfg.api.token and not hmac.compare_digest(self.headers.get("X-API-Key", ""), cfg.api.token):
+                    raise ApiError(401, "hiányzó vagy hibás X-API-Key fejléc")
+                length = int(self.headers.get("Content-Length") or 0)
+                if length > MAX_BODY:
+                    raise ApiError(413, "túl nagy kérés")
+                try:
+                    payload = json.loads(self.rfile.read(length) or b"null")
+                except ValueError:
+                    raise ApiError(400, "érvénytelen JSON")
+                with lock:
+                    status, ctype, body = handle_post(cfg, storage, url.path, payload)
+            except ApiError as exc:
+                status, ctype = exc.status, "application/json; charset=utf-8"
+                body = json.dumps({"error": str(exc)}, ensure_ascii=False).encode()
+            except Exception:
+                log.exception("API-hiba (POST): %s", self.path)
                 status, ctype, body = 500, "application/json; charset=utf-8", b'{"error": "belso hiba"}'
             self.send_response(status)
             self.send_header("Content-Type", ctype)

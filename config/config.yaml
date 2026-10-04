@@ -13,8 +13,9 @@ baseline_days: 7
 # (a többi az adatbázisban van).
 baseline_digest_days: 2
 # A szabad hozzáférésű (OA) PDF-et ennyi napig keressük újra azoknál a cikkeknél,
-# amelyeknek még nincs (a PMC-másolat gyakran napokkal később jelenik meg).
-oa_recheck_days: 30
+# amelyeknek még nincs: az első 7 napban naponta, 30 napig hetente, utána havonta (a PMC-másolat
+# napokkal később jelenik meg, a zárolt cikkek pedig fél-egy év után nyílhatnak meg).
+oa_recheck_days: 365
 # Küldjön-e levelet akkor is, ha nincs új tétel.
 send_empty: false
 
@@ -145,6 +146,20 @@ sections:
     style: compact
 
 # Új, még nem lezárt vizsgálatok a ClinicalTrials.gov-ból (a "vizsgalatok" szekcióba).
+# PDF-letöltés (az n8n workflow ezt kérdezi le és ide jelent vissza)
+downloads:
+  # Csak az elmúlt ennyi órában megjelent vagy PDF-linket kapott cikkeket ajánlja fel letöltésre.
+  window_hours: 24
+  # Ami nem sikerült, azt ennyi naponta próbálja újra, az első próbálkozástól számított ennyi napig.
+  retry_every_days: 30
+  retry_for_days: 365
+  # Mappaszintek kívülről befelé: section | journal | issue | year
+  # Pl. [journal, issue] -> Pediatr Infect Dis J/2026_vol-45_issue-10/2026-<pmid>-<cím>.pdf
+  folders: [journal, issue]
+  # Az n8n nem tud mappát létrehozni, ezért ebbe az egy, mindig létező mappába ment; innen a figyelő
+  # teszi át a PDF-et a végleges mappába (és javítja, ha a PubMed később kiadja az issue-t).
+  inbox: _inbox
+
 clinicaltrials:
   enabled: true
   max_age: 21 years

@@ -7,7 +7,9 @@ from datetime import datetime, timedelta
 
 from .api import serve_in_background
 from .config import load_config
-from .runner import refresh_links, run_once, send_digest
+from .downloads import organize_all, scan_pdf_dir
+from .storage import Storage as _Storage
+from .runner import refresh_bibliography_job, refresh_links, run_once, send_digest
 from .storage import Storage
 
 log = logging.getLogger(__name__)
@@ -38,19 +40,44 @@ def _run(config_path: str | None) -> None:
         log.exception("a napi futás hibával leállt; holnap újrapróbálom (a kimaradt napokat pótolja)")
 
 
+def _once(cfg, name: str, value: str, action) -> None:
+    """Runs `action` once per distinct `value`: the value is remembered in a marker file in the data folder."""
+    marker = cfg.data_dir / f"{name}.done"
+    if marker.exists() and marker.read_text(encoding="utf-8").strip() == value:
+        return
+    action()
+    marker.write_text(value, encoding="utf-8")
+
+
 def _startup_tasks(config_path: str | None) -> None:
-    """Link refresh (new sources apply at once) and the optional one-time digest resend."""
+    """Catch up on link / citation data after downtime, plus the optional one-time actions."""
     cfg = load_config(config_path)
-    try:
-        refresh_links(cfg)
-    except Exception:
-        log.exception("a linkek frissítése indításkor sikertelen; a napi futás megismétli")
-    days = cfg.schedule.digest_on_start_days
-    marker = cfg.data_dir / "digest_on_start.done"
-    if days and (not marker.exists() or marker.read_text(encoding="utf-8").strip() != str(days)):
+    for label, job in (("kiadványadatok", lambda: refresh_bibliography_job(cfg)),
+                       ("linkek", lambda: refresh_links(cfg))):
         try:
-            send_digest(cfg, days)
-            marker.write_text(str(days), encoding="utf-8")
+            job()
+        except Exception:
+            log.exception("a(z) %s frissítése indításkor sikertelen; a napi futás megismétli", label)
+    try:
+        storage = _Storage(cfg.data_dir)
+        try:
+            # PDFs already in the folder count as downloaded, and are filed into their journal / issue folder
+            storage.reconcile_downloads(scan_pdf_dir(cfg.api.pdf_dir), datetime.now().astimezone())
+            organize_all(storage, cfg.api.pdf_dir, cfg.downloads.folders, cfg.downloads.inbox)
+        finally:
+            storage.close()
+    except Exception:
+        log.exception("a PDF-ek rendezése indításkor sikertelen")
+    token = cfg.schedule.link_refresh_on_start
+    if token:
+        try:
+            _once(cfg, "link_refresh_on_start", token, lambda: refresh_links(cfg, force=True))
+        except Exception:
+            log.exception("az egyszeri teljes linkfrissítés sikertelen")
+    days = cfg.schedule.digest_on_start_days
+    if days:
+        try:
+            _once(cfg, "digest_on_start", str(days), lambda: send_digest(cfg, days))
         except Exception:
             log.exception("az egyszeri összesítő levél küldése sikertelen")
 

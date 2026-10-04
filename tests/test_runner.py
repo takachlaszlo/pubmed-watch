@@ -126,13 +126,13 @@ def test_refresh_links_upgrades_europepmc_link_later(cfg, mails):
     storage = Storage(cfg.data_dir)
     assert storage.article("42814651")["pdf_source"] == "europepmc"
     storage.close()
-    assert runner.refresh_links(cfg, http=FakeHttp(cfg, s3_pmcids=("PMC13626073",)), today=DAY1) == 1
+    assert runner.refresh_links(cfg, http=FakeHttp(cfg, s3_pmcids=("PMC13626073",)), today=DAY1, force=True) == 1
     storage = Storage(cfg.data_dir)
     assert storage.article("42814651")["pdf_source"] == "pmc-s3"
     storage.close()
     # once on the best source it is not looked up again
     http = FakeHttp(cfg, s3_pmcids=("PMC13626073",))
-    assert runner.refresh_links(cfg, http=http, today=DAY1) == 0 and not http.calls
+    assert runner.refresh_links(cfg, http=http, today=DAY1, force=True) == 0 and not http.calls
 
 
 def test_send_digest_from_database(cfg, mails):

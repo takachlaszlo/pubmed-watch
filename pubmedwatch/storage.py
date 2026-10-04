@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .models import Article, Trial
-from .openaccess import PDF_SOURCE_RANK, OaLinks
+from .openaccess import AUTO_DOWNLOAD_SOURCES, PDF_SOURCE_RANK, OaLinks
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -44,6 +44,9 @@ CREATE TABLE IF NOT EXISTS articles (
     doi TEXT NOT NULL DEFAULT '',
     pmcid TEXT NOT NULL DEFAULT '',
     publication_status TEXT NOT NULL DEFAULT '',
+    volume TEXT NOT NULL DEFAULT '',
+    issue TEXT NOT NULL DEFAULT '',
+    bibl_checked_at TEXT NOT NULL DEFAULT '',
     kind TEXT NOT NULL DEFAULT 'other',
     is_update INTEGER NOT NULL DEFAULT 0,
     section TEXT NOT NULL DEFAULT '',
@@ -88,6 +91,20 @@ CREATE TABLE IF NOT EXISTS trials (
     updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS trials_first_seen ON trials(first_seen_at);
+-- What happened to each PDF download. `ok` rows are permanent: an article is never downloaded twice.
+CREATE TABLE IF NOT EXISTS downloads (
+    pmid TEXT PRIMARY KEY,
+    status TEXT NOT NULL,                       -- ok | failed
+    attempts INTEGER NOT NULL DEFAULT 0,
+    first_attempt_at TEXT NOT NULL,
+    last_attempt_at TEXT NOT NULL,
+    next_retry_at TEXT NOT NULL DEFAULT '',     -- failed rows: when the next monthly try is due
+    last_error TEXT NOT NULL DEFAULT '',
+    path TEXT NOT NULL DEFAULT '',
+    bytes INTEGER,
+    saved_at TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT ''             -- n8n (reported) | disk (found in the PDF folder)
+);
 """
 
 JSON_ARTICLE = ("abstract", "authors", "pub_types", "mesh", "keywords")
@@ -107,6 +124,14 @@ class Storage:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        columns = {r[1] for r in self.db.execute("PRAGMA table_info(articles)")}
+        for name in ("volume", "issue", "bibl_checked_at"):
+            if name not in columns:
+                self.db.execute(f"ALTER TABLE articles ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
+        self.db.commit()
 
     def close(self) -> None:
         self.db.close()
@@ -155,13 +180,14 @@ class Storage:
         ts = now_iso()
         self.db.execute(
             "INSERT INTO articles (pmid, title, abstract, authors, journal, journal_abbrev, pub_year, pub_date, "
-            "entrez_date, pub_types, mesh, keywords, language, doi, pmcid, publication_status, kind, is_update, "
-            "section, oa, url_fulltext, url_pdf, pdf_source, first_seen_at, first_seen_run, updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "entrez_date, pub_types, mesh, keywords, language, doi, pmcid, publication_status, volume, issue, "
+            "bibl_checked_at, kind, is_update, section, oa, url_fulltext, url_pdf, pdf_source, first_seen_at, "
+            "first_seen_run, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (a.pmid, a.title, json.dumps(a.abstract, ensure_ascii=False), json.dumps(a.authors, ensure_ascii=False),
              a.journal, a.journal_abbrev, a.pub_year, a.pub_date, a.entrez_date,
              json.dumps(a.pub_types), json.dumps(a.mesh, ensure_ascii=False), json.dumps(a.keywords, ensure_ascii=False),
-             a.language, a.doi, a.pmcid, a.publication_status, a.kind, int(a.is_update), section, int(a.oa),
+             a.language, a.doi, a.pmcid, a.publication_status, a.volume, a.issue, ts, a.kind, int(a.is_update),
+             section, int(a.oa),
              a.url_fulltext, a.url_pdf, a.pdf_source, ts, run_id, ts))
 
     def add_topics(self, pmid: str, topic_ids: Iterable[str], run_id: int) -> list[str]:
@@ -181,20 +207,19 @@ class Storage:
         row = self.db.execute("SELECT kind FROM articles WHERE pmid=?", (pmid,)).fetchone()
         return row[0] if row else "other"
 
-    def pending_oa(self, since_iso: str, today_iso: str, force: bool = False,
-                   fresh_days: int = 7, stale_days: int = 6) -> list[tuple[str, str, str, str]]:
+    def pending_oa(self, since_iso: str, today_iso: str, force: bool = False) -> list[tuple[str, str, str, str]]:
         """(pmid, doi, pmcid, stored pdf url) of recent articles whose PDF link can still improve: none yet, or
-        only a link for people. Back-off: daily while the article is younger than `fresh_days`, afterwards
-        about weekly. Articles already checked today are skipped; `force` ignores both rules."""
+        only a link for people. Back-off by the article's age: checked daily during the first 7 days, weekly up to
+        30 days, then monthly (until `since_iso`). `force` ignores the back-off and the checked-today rule."""
         sql = ("SELECT pmid, doi, pmcid, url_pdf FROM articles "
                "WHERE pdf_source IN ('', 'europepmc', 'unpaywall-web') AND first_seen_at>=?")
         args: list = [since_iso]
         if not force:
-            today = date.fromisoformat(today_iso)
-            sql += (" AND substr(oa_checked_at, 1, 10)<>? AND (oa_checked_at='' OR substr(first_seen_at, 1, 10)>=? "
-                    "OR substr(oa_checked_at, 1, 10)<=?)")
-            args += [today_iso, (today - timedelta(days=fresh_days)).isoformat(),
-                     (today - timedelta(days=stale_days)).isoformat()]
+            age = "(julianday(?) - julianday(substr(first_seen_at, 1, 10)))"
+            since_check = "(julianday(?) - julianday(substr(oa_checked_at, 1, 10)))"
+            sql += (f" AND (oa_checked_at='' OR {since_check} >= "
+                    f"CASE WHEN {age} <= 7 THEN 1 WHEN {age} <= 30 THEN 7 ELSE 30 END)")
+            args += [today_iso, today_iso, today_iso]
         return [(r[0], r[1], r[2], r[3]) for r in self.db.execute(sql, args)]
 
     def update_oa(self, pmid: str, links: OaLinks) -> bool:
@@ -218,6 +243,140 @@ class Storage:
     def mark_oa_checked(self, pmids: Iterable[str]) -> None:
         ts = now_iso()
         self.db.executemany("UPDATE articles SET oa_checked_at=? WHERE pmid=?", [(ts, p) for p in pmids])
+
+    def pending_bibliography(self, today_iso: str, limit: int = 400, horizon_days: int = 180,
+                             every_days: int = 7) -> list[str]:
+        """PMIDs whose citation data should be (re)read from PubMed: never read yet (older databases), or still
+        without volume/issue, i.e. online ahead of print, re-read weekly for `horizon_days`."""
+        today = date.fromisoformat(today_iso)
+        rows = self.db.execute(
+            "SELECT pmid FROM articles WHERE bibl_checked_at='' OR (volume='' AND issue='' AND "
+            "substr(first_seen_at, 1, 10)>=? AND (julianday(?) - julianday(substr(bibl_checked_at, 1, 10))) >= ?) "
+            "ORDER BY first_seen_at DESC LIMIT ?",
+            ((today - timedelta(days=horizon_days)).isoformat(), today_iso, every_days, limit))
+        return [r[0] for r in rows]
+
+    def update_bibliography(self, a: Article) -> None:
+        self.db.execute("UPDATE articles SET volume=?, issue=?, pub_date=?, pub_year=?, publication_status=?, "
+                        "bibl_checked_at=? WHERE pmid=?",
+                        (a.volume, a.issue, a.pub_date, a.pub_year, a.publication_status, now_iso(), a.pmid))
+
+    def mark_bibliography_checked(self, pmids: Iterable[str]) -> None:
+        ts = now_iso()
+        self.db.executemany("UPDATE articles SET bibl_checked_at=? WHERE pmid=?", [(ts, p) for p in pmids])
+
+    # --- downloads ledger ---------------------------------------------------------------------
+    def downloads_due(self, now: datetime, hours: int, retry_for_days: int, path_for) -> list[dict]:
+        """Articles an automated download should be attempted for right now.
+
+        - new: a PDF link a script may fetch, never attempted, that appeared (or was found) within `hours`;
+        - retry: attempted and failed, and the monthly retry is due (within `retry_for_days` of the first try);
+        - relinked: failed earlier, but the PDF link changed since the last attempt, so it deserves a new try.
+        Anything already downloaded (`ok`) is never offered again."""
+        marks = ",".join("?" * len(AUTO_DOWNLOAD_SOURCES))
+        stamp = lambda dt: dt.isoformat(timespec="seconds")  # noqa: E731
+        # path_for(article) -> {"path": where n8n saves it (inbox), "final_path": where it ends up}
+        due: list[dict] = []
+        new_rows = self.db.execute(
+            f"SELECT a.* FROM articles a LEFT JOIN downloads d ON d.pmid=a.pmid WHERE d.pmid IS NULL "
+            f"AND a.url_pdf<>'' AND a.pdf_source IN ({marks}) AND datetime(a.updated_at) >= datetime(?) "
+            f"ORDER BY a.pmid", (*AUTO_DOWNLOAD_SOURCES, stamp(now - timedelta(hours=hours))))
+        for row in new_rows:
+            due.append(self._with_download(row, "new", 0, "", path_for))
+        retry_rows = self.db.execute(
+            f"SELECT a.*, d.attempts AS d_attempts, d.last_error AS d_error, "
+            f"(datetime(d.next_retry_at) <= datetime(?)) AS d_monthly "
+            f"FROM downloads d JOIN articles a ON a.pmid=d.pmid WHERE d.status='failed' AND a.url_pdf<>'' "
+            f"AND a.pdf_source IN ({marks}) AND datetime(d.first_attempt_at) >= datetime(?) "
+            f"AND (datetime(d.next_retry_at) <= datetime(?) OR datetime(a.updated_at) > datetime(d.last_attempt_at)) "
+            f"ORDER BY a.pmid", (stamp(now), *AUTO_DOWNLOAD_SOURCES, stamp(now - timedelta(days=retry_for_days)),
+                                 stamp(now)))
+        for row in retry_rows:
+            due.append(self._with_download(row, "retry" if row["d_monthly"] else "relinked", row["d_attempts"],
+                                           row["d_error"], path_for))
+        return due
+
+    def _with_download(self, row: sqlite3.Row, reason: str, attempts: int, last_error: str, path_for) -> dict:
+        article = self.article_dict(row)
+        for extra in ("d_attempts", "d_error", "d_monthly"):
+            article.pop(extra, None)
+        article["download"] = {"reason": reason, "attempts": attempts, "last_error": last_error,
+                               **path_for(article)}
+        return article
+
+    def report_download(self, pmid: str, status: str, now: datetime, retry_every_days: int, path: str = "",
+                        size: int | None = None, error: str = "", retry_in_days: int | None = None) -> dict:
+        """Records the outcome of one attempt. `ok` is final; `failed` schedules the next try: monthly by default
+        (`retry_every_days`), or after `retry_in_days` for local problems such as an unwritable folder."""
+        ts = now.isoformat(timespec="seconds")
+        row = self.db.execute("SELECT * FROM downloads WHERE pmid=?", (pmid,)).fetchone()
+        if row is not None and row["status"] == "ok":
+            return dict(row)  # a late failure report must never undo a success
+        attempts = (row["attempts"] if row else 0) + 1
+        first = row["first_attempt_at"] if row else ts
+        if status == "ok":
+            values = ("ok", attempts, first, ts, "", "", path, size, ts, "n8n")
+        else:
+            retry_at = (now + timedelta(days=retry_in_days or retry_every_days)).isoformat(timespec="seconds")
+            values = ("failed", attempts, first, ts, retry_at, error[:300], "", None, "", "n8n")
+        self.db.execute(
+            "INSERT OR REPLACE INTO downloads (pmid, status, attempts, first_attempt_at, last_attempt_at, "
+            "next_retry_at, last_error, path, bytes, saved_at, source) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (pmid, *values))
+        self.db.commit()
+        return dict(self.db.execute("SELECT * FROM downloads WHERE pmid=?", (pmid,)).fetchone())
+
+    def reconcile_downloads(self, files: Iterable[tuple[str, str, int, str]], now: datetime) -> int:
+        """Marks articles `ok` whose PDF is already in the PDF folder (name carries the PMID). Returns how many
+        were newly marked. Second protection against downloading something twice, independent of n8n's reports."""
+        ts = now.isoformat(timespec="seconds")
+        marked = 0
+        for pmid, relpath, size, modified in files:
+            row = self.db.execute("SELECT status, attempts, first_attempt_at FROM downloads WHERE pmid=?",
+                                  (pmid,)).fetchone()
+            if row is not None and row["status"] == "ok":
+                continue
+            self.db.execute(
+                "INSERT OR REPLACE INTO downloads (pmid, status, attempts, first_attempt_at, last_attempt_at, "
+                "next_retry_at, last_error, path, bytes, saved_at, source) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (pmid, "ok", row["attempts"] if row else 0, row["first_attempt_at"] if row else modified, ts, "", "",
+                 relpath, size, modified, "disk"))
+            marked += 1
+        if marked:
+            self.db.commit()
+        return marked
+
+    def downloads(self, status: str | None = None, limit: int = 100, offset: int = 0) -> list[dict]:
+        sql = ("SELECT d.*, a.title, a.journal_abbrev, a.pdf_source, a.section FROM downloads d "
+               "LEFT JOIN articles a ON a.pmid=d.pmid")
+        args: list = []
+        if status:
+            sql += " WHERE d.status=?"
+            args.append(status)
+        sql += " ORDER BY d.last_attempt_at DESC, d.pmid LIMIT ? OFFSET ?"
+        return [dict(r) for r in self.db.execute(sql, (*args, limit, offset))]
+
+    def downloads_to_organize(self, only_pmid: str | None = None) -> list[tuple[str, str, dict]]:
+        """(pmid, path the ledger says the PDF is at, article) for downloaded articles we know the citation of."""
+        sql = ("SELECT a.*, d.path AS d_path FROM downloads d JOIN articles a ON a.pmid=d.pmid "
+               "WHERE d.status='ok' AND d.path<>''")
+        args: list = []
+        if only_pmid:
+            sql += " AND d.pmid=?"
+            args.append(only_pmid)
+        out = []
+        for row in self.db.execute(sql, args):
+            current = row["d_path"]
+            article = self.article_dict(row)
+            article.pop("d_path", None)
+            out.append((article["pmid"], current, article))
+        return out
+
+    def set_download_path(self, pmid: str, path: str) -> None:
+        self.db.execute("UPDATE downloads SET path=? WHERE pmid=?", (path, pmid))
+
+    def has_article(self, pmid: str) -> bool:
+        return self.db.execute("SELECT 1 FROM articles WHERE pmid=?", (pmid,)).fetchone() is not None
 
     def commit(self) -> None:
         self.db.commit()
@@ -321,4 +480,6 @@ class Storage:
             "articles_with_pdf": self.db.execute("SELECT COUNT(*) FROM articles WHERE url_pdf<>''").fetchone()[0],
             "trials": self.db.execute("SELECT COUNT(*) FROM trials").fetchone()[0],
             "runs": self.db.execute("SELECT COUNT(*) FROM runs").fetchone()[0],
+            "downloads_ok": self.db.execute("SELECT COUNT(*) FROM downloads WHERE status='ok'").fetchone()[0],
+            "downloads_failed": self.db.execute("SELECT COUNT(*) FROM downloads WHERE status='failed'").fetchone()[0],
         }

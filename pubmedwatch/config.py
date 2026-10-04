@@ -9,6 +9,8 @@ from typing import Any
 
 import yaml
 
+from .downloads import DEFAULT_INBOX, FOLDER_KINDS
+
 DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "config" / "config.yaml"
 SECTION_STYLES = ("full", "compact", "trials")
 GUIDELINE_SECTION = "iranyelvek"
@@ -60,6 +62,7 @@ class ScheduleConfig:
     run_at: str  # HH:MM local time
     run_on_start: bool
     catch_up: bool
+    link_refresh_on_start: str  # any new value forces one full PDF-link refresh at start (e.g. after adding a source)
     digest_on_start_days: int  # 0 = off; N = once per distinct value, mail the last N days from the database
 
     @classmethod
@@ -68,7 +71,8 @@ class ScheduleConfig:
         if not re.fullmatch(r"\d{1,2}:\d{2}", run_at):
             raise ValueError(f"RUN_AT formátuma ÓÓ:PP legyen, nem {run_at!r}")
         return cls(run_at=run_at, run_on_start=_env_bool("RUN_ON_START", False),
-                   catch_up=_env_bool("CATCH_UP", True), digest_on_start_days=int(_env("DIGEST_ON_START_DAYS", "0") or 0))
+                   catch_up=_env_bool("CATCH_UP", True), link_refresh_on_start=_env("LINK_REFRESH_ON_START"),
+                   digest_on_start_days=int(_env("DIGEST_ON_START_DAYS", "0") or 0))
 
 
 @dataclass
@@ -76,11 +80,12 @@ class ApiConfig:
     port: int  # 0 = disabled
     token: str  # empty = no authentication (LAN only)
     webhook_url: str  # n8n webhook called after each run; empty = off
+    pdf_dir: Path  # the folder the PDFs are saved to, as this container sees it (read-only is enough)
 
     @classmethod
     def from_env(cls) -> "ApiConfig":
         return cls(port=int(_env("API_PORT", "8765") or 0), token=_env("API_TOKEN"),
-                   webhook_url=_env("N8N_WEBHOOK_URL"))
+                   webhook_url=_env("N8N_WEBHOOK_URL"), pdf_dir=Path(_env("PDF_DIR", "/pdfs")))
 
 
 @dataclass
@@ -128,10 +133,20 @@ class TrialsConfig:
 
 
 @dataclass
+class DownloadsConfig:
+    window_hours: int  # new / newly linked articles are offered for download within this many hours
+    retry_every_days: int  # a failed download is tried again this often ...
+    retry_for_days: int  # ... until this many days after the first attempt
+    folders: list[str]  # PDF folder levels, outermost first: section | journal | issue | year
+    inbox: str  # flat folder n8n saves into; the service files the PDFs from here
+
+
+@dataclass
 class Config:
     topics: list[Topic]
     sections: list[Section]
     trials: TrialsConfig
+    downloads: DownloadsConfig
     lookback_days: int
     baseline_days: int
     oa_recheck_days: int
@@ -193,13 +208,25 @@ def load_config(path: str | os.PathLike | None = None) -> Config:
         conditions=" ".join(str(ct.get("conditions", "")).split()),
         terms=" ".join(str(ct.get("terms", "")).split()),
     )
+    dl = raw.get("downloads") or {}
+    downloads = DownloadsConfig(
+        window_hours=int(dl.get("window_hours", 24)),
+        retry_every_days=int(dl.get("retry_every_days", 30)),
+        retry_for_days=int(dl.get("retry_for_days", 365)),
+        folders=[str(f) for f in dl.get("folders", ["journal", "issue"])],
+        inbox=str(dl.get("inbox", DEFAULT_INBOX)),
+    )
+    for folder in downloads.folders:
+        if folder not in FOLDER_KINDS:
+            raise ValueError(f"ismeretlen mappa-típus a downloads.folders-ben: {folder} (lehet: {', '.join(FOLDER_KINDS)})")
     return Config(
         topics=topics,
         sections=sections,
         trials=trials,
+        downloads=downloads,
         lookback_days=int(raw.get("lookback_days", 2)),
         baseline_days=int(raw.get("baseline_days", 7)),
-        oa_recheck_days=int(raw.get("oa_recheck_days", 30)),
+        oa_recheck_days=int(raw.get("oa_recheck_days", 365)),
         baseline_digest_days=int(raw.get("baseline_digest_days", 2)),
         send_empty=bool(raw.get("send_empty", False)),
         data_dir=Path(_env("PUBMEDWATCH_DATA", "/data")),

@@ -10,7 +10,9 @@ from logging.handlers import RotatingFileHandler
 from .config import load_config
 from .mailer import send
 from .pubmed import PubMed
-from .runner import make_http, refresh_links, run_once, send_digest
+from .downloads import organize_all
+from .runner import make_http, refresh_bibliography_job, refresh_links, run_once, send_digest
+from .storage import Storage
 from .scheduler import daemon
 
 
@@ -44,6 +46,8 @@ def main(argv: list[str] | None = None) -> int:
     digest.add_argument("--days", type=int, default=2)
     digest.add_argument("--send", action="store_true", help="el is küldi e-mailben")
     sub.add_parser("refresh-links", help="PDF/teljes szöveg linkek újrakeresése a friss cikkeknél")
+    sub.add_parser("refresh-bibliography", help="kötet/szám újraolvasása a PubMedből, ahol még hiányzik")
+    sub.add_parser("organize", help="a letöltött PDF-ek mappákba rendezése (folyóirat/issue)")
     sub.add_parser("serve", help="csak az API futtatása")
     sub.add_parser("test-mail", help="próbalevél küldése az SMTP-beállítások ellenőrzéséhez")
     args = parser.parse_args(argv)
@@ -67,6 +71,14 @@ def main(argv: list[str] | None = None) -> int:
         print(send_digest(cfg, args.days, send_mail=args.send).text)
     elif args.command == "refresh-links":
         print(f"frissült: {refresh_links(cfg)}")
+    elif args.command == "refresh-bibliography":
+        print(f"kötet/szám ismert lett: {refresh_bibliography_job(cfg)}")
+    elif args.command == "organize":
+        storage = Storage(cfg.data_dir)
+        try:
+            print(f"áthelyezve: {organize_all(storage, cfg.api.pdf_dir, cfg.downloads.folders, cfg.downloads.inbox)}")
+        finally:
+            storage.close()
     elif args.command == "serve":
         from .api import make_server
         server = make_server(cfg)
