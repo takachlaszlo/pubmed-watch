@@ -374,15 +374,15 @@ def wiley_url(doi: str) -> str:
 
 
 def wiley_links(http: HttpClient, dois: dict[str, str], token: str,
-                human: dict[str, str] | None = None) -> dict[str, OaLinks]:
-    """Wiley articles the TDM token may download (one polite probe each; Wiley allows 60 requests / 10 minutes)."""
+                human: dict[str, str] | None = None, limit: int = 30) -> dict[str, OaLinks]:
+    """Wiley articles the TDM token may download (one polite probe each; Wiley allows 60 requests / 10 minutes, so
+    at most `limit` per run, the rest is looked at on a later day)."""
     if not token:
         return {}
     human = human or {}
     found: dict[str, OaLinks] = {}
-    for pmid, doi in dois.items():
-        if not doi.lower().startswith(WILEY_PREFIXES):
-            continue
+    wiley = [(p, d) for p, d in dois.items() if d.lower().startswith(WILEY_PREFIXES)]
+    for pmid, doi in wiley[:limit]:
         if _is_pdf(*http.probe(wiley_url(doi), headers=wiley_headers(token))):
             found[pmid] = OaLinks(oa=True, pdf_source="wiley", url_pdf=human.get(pmid) or f"https://doi.org/{doi}")
     return found
@@ -400,16 +400,21 @@ def parse_core_results(data: dict) -> list[str]:
     return urls
 
 
-def core_links(http: HttpClient, dois: dict[str, str], api_key: str, limit: int = 40) -> dict[str, OaLinks]:
-    """Repository copies (often accepted manuscripts) that CORE knows of; tried once each like Unpaywall's."""
+def core_links(http: HttpClient, dois: dict[str, str], api_key: str, limit: int = 20) -> dict[str, OaLinks]:
+    """Repository copies (often accepted manuscripts) that CORE knows of; tried once each like Unpaywall's.
+    CORE's free tier is strict: at the first "too many requests" answer CORE is left alone for the rest of the run."""
     if not api_key:
         return {}
     found: dict[str, OaLinks] = {}
     for pmid, doi in list(dois.items())[:limit]:
         try:
             data = http.get_json(CORE_SEARCH, {"q": f'doi:"{doi}"', "limit": 3},
-                                 headers={"Authorization": f"Bearer {api_key}"})
+                                 headers={"Authorization": f"Bearer {api_key}"}, attempts=1)
         except Exception as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            if status == 429:
+                log.warning("CORE: túl sok kérés (429), ebben a futásban nem kérdezem tovább")
+                break
             log.debug("CORE: nincs adat (%s): %s", doi, redact(exc))
             continue
         for url in parse_core_results(data)[:2]:

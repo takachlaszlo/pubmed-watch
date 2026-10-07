@@ -41,7 +41,7 @@ def make_http(cfg: Config) -> HttpClient:
                        "clinicaltrials.gov": 0.5, "pmc-oa-opendata.s3.amazonaws.com": 0.1,
                        "api.openalex.org": 0.2, "content.openalex.org": 0.5, "api.elsevier.com": 0.3,
                        "api.wiley.com": 10.5,  # Wiley TDM allows 60 requests per 10 minutes
-                       "api.core.ac.uk": 2.0, "www.medrxiv.org": 1.0, "www.biorxiv.org": 1.0, "api.biorxiv.org": 1.0})
+                       "api.core.ac.uk": 6.0, "www.medrxiv.org": 1.0, "www.biorxiv.org": 1.0, "api.biorxiv.org": 1.0})
 
 
 def search_window(storage: Storage, cfg: Config, today: date) -> tuple[date, date, bool]:
@@ -79,6 +79,9 @@ def enrich_links(storage: Storage, http: HttpClient, cfg: Config, today: date, f
             if links.pdf_source in AUTO_DOWNLOAD_SOURCES and pmid in open_:
                 open_.discard(pmid)
                 gained[label] += 1
+        # commit after every source: the next one may take minutes on the network, and an open write transaction
+        # would lock the API out (n8n's download reports could not be recorded)
+        storage.commit()
 
     def still_open_dois() -> dict[str, str]:
         return {p: dois[p] for p in sorted(open_) if p in dois}
@@ -115,11 +118,13 @@ def enrich_links(storage: Storage, http: HttpClient, cfg: Config, today: date, f
         for pmid, links in unpaywall_provenance(http, {p: lookup[p] for p in todo if p in lookup},
                                                 src.unpaywall_email, stored).items():
             changed += storage.update_oa(pmid, links)
+        storage.commit()
     if cfg.downloads.preprints:
         for pmid, links in preprint_links(http, storage.preprint_ids(sorted(open_)), src.unpaywall_email).items():
             if storage.update_preprint(pmid, links):
                 changed += 1
                 gained["preprint"] += links.source == "preprint"
+        storage.commit()
     storage.mark_oa_checked(p for p, *_ in pending)
     storage.commit()
     if backfill:

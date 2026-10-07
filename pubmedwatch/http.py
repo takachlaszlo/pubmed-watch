@@ -41,23 +41,28 @@ class HttpClient:
         if wait > 0:
             time.sleep(wait)
 
-    def request(self, method: str, url: str, **kwargs) -> requests.Response:
-        for attempt in range(1, self.attempts + 1):
+    def request(self, method: str, url: str, attempts: int | None = None, **kwargs) -> requests.Response:
+        attempts = attempts or self.attempts
+        for attempt in range(1, attempts + 1):
             self._pace(url)
             try:
                 resp = self.session.request(method, url, timeout=self.timeout, **kwargs)
             except requests.RequestException as exc:
-                if attempt == self.attempts:
+                if attempt == attempts:
                     raise requests.RequestException(redact(exc)) from None
                 log.warning("hálózati hiba (%s), újrapróbálom: %s", urlsplit(url).hostname, redact(exc))
             else:
-                if resp.status_code not in RETRY_STATUS or attempt == self.attempts:
+                if resp.status_code not in RETRY_STATUS or attempt == attempts:
                     if resp.status_code >= 400:
                         resp.close()
                         raise requests.HTTPError(f"HTTP {resp.status_code} ({urlsplit(url).hostname})", response=resp)
                     return resp
                 resp.close()
                 log.warning("%s válasza %d, újrapróbálom", urlsplit(url).hostname, resp.status_code)
+                retry_after = resp.headers.get("Retry-After", "")
+                if resp.status_code == 429 and retry_after.isdigit():  # the service says how long to wait
+                    time.sleep(min(int(retry_after), 120))
+                    continue
             time.sleep(self.backoff * attempt)
         raise RuntimeError("unreachable")
 
@@ -79,8 +84,9 @@ class HttpClient:
         """GET whose body is read by the caller in chunks (the caller must close it)."""
         return self.request("GET", url, headers=headers, params=params, stream=True)
 
-    def get_json(self, url: str, params: dict | None = None, headers: dict | None = None) -> dict:
-        return self.request("GET", url, params=params, headers=headers).json()
+    def get_json(self, url: str, params: dict | None = None, headers: dict | None = None,
+                 attempts: int | None = None) -> dict:
+        return self.request("GET", url, params=params, headers=headers, attempts=attempts).json()
 
     def get_text(self, url: str, params: dict | None = None) -> str:
         return self.request("GET", url, params=params).text

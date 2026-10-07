@@ -354,7 +354,7 @@ def test_medrxiv_preprint_without_any_listed_pdf_uses_the_medrxiv_api(cfg):
     record["resultList"]["result"][0]["fullTextUrlList"] = {"fullTextUrl": []}
 
     class Http(FakeHttp):
-        def get_json(self, url, params=None, headers=None):
+        def get_json(self, url, params=None, headers=None, attempts=None):
             if url.startswith("https://api.biorxiv.org/details/medrxiv/"):
                 self.calls.append(("GET", url, {}))
                 return {"collection": [{"version": "1"}, {"version": "2"}]}
@@ -378,3 +378,46 @@ def test_adding_a_key_triggers_one_full_link_refresh(cfg, monkeypatch):
     scheduler._startup_tasks(None)                 # a key was added: forced once more
     assert calls.count(True) == 2 and calls.count(False) == 3
     assert "NEW" not in (cfg.data_dir / "link_refresh_sources.done").read_text(encoding="utf-8")  # names, not keys
+
+
+def test_core_backs_off_at_the_first_rate_limit_answer(cfg):
+    class Limited(FakeHttp):
+        def get_json(self, url, params=None, headers=None, attempts=None):
+            if "api.core.ac.uk" in url:
+                self.calls.append(("GET", url, params or {}))
+                assert attempts == 1  # no hammering: one try per question
+                resp = requests.Response()
+                resp.status_code = 429
+                raise requests.HTTPError("HTTP 429 (api.core.ac.uk)", response=resp)
+            return super().get_json(url, params, headers, attempts)
+
+    http = Limited(cfg)
+    assert core_links(http, {"1": "10.1/a", "2": "10.1/b", "3": "10.1/c"}, "CKEY") == {}
+    assert len([c for c in http.calls if "api.core.ac.uk" in c[1]]) == 1  # stopped after the first refusal
+
+
+def test_a_long_link_search_does_not_lock_out_the_api(cfg, store):
+    """While a slow source is being asked, another connection (the API recording n8n's report) must be able to write."""
+    import sqlite3 as sq
+    cfg.sources.openalex_api_key = "OKEY"
+    put(store, "1", DOI_A)
+    put(store, "2", DOI_B)
+    outcome = {}
+
+    class Slow(FakeHttp):
+        def get_json(self, url, params=None, headers=None, attempts=None):
+            if "api.openalex.org" in url:  # meanwhile the API writes
+                other = sq.connect(cfg.data_dir / "pubmed.db", timeout=0.2)
+                try:
+                    other.execute("INSERT INTO downloads (pmid, version, status, first_attempt_at, last_attempt_at) "
+                                  "VALUES ('x', 'vor', 'failed', 't', 't')")
+                    other.commit()
+                    outcome["write"] = "ok"
+                except sq.OperationalError as exc:
+                    outcome["write"] = str(exc)
+                finally:
+                    other.close()
+            return super().get_json(url, params, headers, attempts)
+
+    runner.refresh_links(cfg, http=Slow(cfg, openalex=OA), today=TODAY, force=True)
+    assert outcome["write"] == "ok"

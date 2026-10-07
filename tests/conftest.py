@@ -89,7 +89,7 @@ class FakeHttp:
             return FakeResponse(content=ET.tostring(root))
         raise AssertionError(f"váratlan kérés: {method} {url}")
 
-    def get_json(self, url, params=None, headers=None):
+    def get_json(self, url, params=None, headers=None, attempts=None):
         self.calls.append(("GET", url, params or {}))
         self.headers_seen.append(headers or {})
         if "europepmc" in url:

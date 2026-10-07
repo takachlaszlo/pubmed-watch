@@ -25,6 +25,7 @@ from __future__ import annotations
 import hmac
 import json
 import logging
+import sqlite3
 import threading
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -267,7 +268,12 @@ def make_server(cfg: Config, host: str = "0.0.0.0", http=None) -> ThreadingHTTPS
                 except ValueError:
                     raise ApiError(400, "érvénytelen JSON")
                 with lock:
-                    status, ctype, body = handle_post(cfg, storage, url.path, payload)
+                    try:
+                        status, ctype, body = handle_post(cfg, storage, url.path, payload)
+                    except sqlite3.OperationalError as exc:
+                        if "locked" not in str(exc):
+                            raise
+                        raise ApiError(503, "az adatbázis épp foglalt, próbáld újra később")
             except ApiError as exc:
                 status, ctype = exc.status, "application/json; charset=utf-8"
                 body = json.dumps({"error": str(exc)}, ensure_ascii=False).encode()
