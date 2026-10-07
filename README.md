@@ -153,6 +153,15 @@ előre létre kell hozni, és az n8n-nek írnia kell tudnia bele.
 Egyéb minta: a compose-ban az `N8N_WEBHOOK_URL`-t egy n8n Webhook node URL-jére állítva minden futás után
 POST érkezik `{event, run_id, window, counts, articles[], trials[]}` tartalommal.
 
+## Önfrissítés
+
+A konténer minden induláskor a GitHubról tölti le a programot (`main` ág), ezért egy frissítéshez elég az
+újraindítás. Ezt a figyelő maga intézi: naponta, fél órával a napi futás előtt (alapból 06:00-kor) megkérdezi a
+GitHubtól a legújabb változat azonosítóját, és ha az eltér attól, amivel elindult, kilép; a Docker
+(`restart: unless-stopped`) azonnal újraindítja, és az új kód tölti le magát. Ha a GitHub épp nem érhető el, vagy
+nem tudni, mi fut, nem indul újra. Kikapcsolás: `AUTO_UPDATE: "false"` a compose-ban. A futó változatot a
+`GET /health` válaszának `version` mezője mutatja.
+
 ## Telepítés a NAS-ra
 
 1. `\\Becalel\docker\pubmed-watch\` mappa, benne a [`compose.yaml`](compose.yaml) és egy üres `data` mappa.

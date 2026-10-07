@@ -15,7 +15,8 @@ ALL_PMIDS = ["42816283", "42805330", "42803594", "42814651", "42810927", "428258
 
 @pytest.fixture(autouse=True)
 def _quiet_env(monkeypatch, tmp_path):
-    for name in ("NCBI_API_KEY", "UNPAYWALL_EMAIL", "N8N_WEBHOOK_URL", "API_TOKEN", "PUBMEDWATCH_CONFIG"):
+    for name in ("NCBI_API_KEY", "UNPAYWALL_EMAIL", "N8N_WEBHOOK_URL", "API_TOKEN", "PUBMEDWATCH_CONFIG",
+                 "AUTO_UPDATE", "UPDATE_REPO", "UPDATE_BRANCH"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("PUBMEDWATCH_DATA", str(tmp_path / "data"))
 

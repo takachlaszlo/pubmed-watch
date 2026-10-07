@@ -30,6 +30,9 @@ services:
       RUN_ON_START: "false"
       # "true" = ha a konténer a RUN_AT után indul és aznap még nem volt futás, pótolja
       CATCH_UP: "true"
+      # önfrissítés: naponta, fél órával a RUN_AT előtt megnézi a GitHubot, és ha újabb változat van, újraindul
+      # (a konténer minden induláskor a GitHubról tölti le a programot). "false" = kikapcsolva
+      AUTO_UPDATE: "true"
       # egyszeri összesítő levél az adatbázisból az utolsó N napról (0 = ki). Minden értéknél csak egyszer
       # küld; újabb küldéshez írj be másik számot.
       DIGEST_ON_START_DAYS: "0"

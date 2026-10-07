@@ -76,6 +76,18 @@ class ScheduleConfig:
 
 
 @dataclass
+class UpdateConfig:
+    enabled: bool  # restart for a newer version on GitHub, once a day before the daily run
+    repo: str  # owner/name on GitHub, the one compose.yaml downloads
+    branch: str
+
+    @classmethod
+    def from_env(cls) -> "UpdateConfig":
+        return cls(enabled=_env_bool("AUTO_UPDATE", True), repo=_env("UPDATE_REPO", "takachlaszlo/pubmed-watch"),
+                   branch=_env("UPDATE_BRANCH", "main"))
+
+
+@dataclass
 class ApiConfig:
     port: int  # 0 = disabled
     token: str  # empty = no authentication (LAN only)
@@ -183,6 +195,7 @@ class Config:
     data_dir: Path
     mail: MailConfig = field(default_factory=MailConfig.from_env)
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig.from_env)
+    update: UpdateConfig = field(default_factory=UpdateConfig.from_env)
     api: ApiConfig = field(default_factory=ApiConfig.from_env)
     sources: SourceConfig = field(default_factory=SourceConfig.from_env)
     report: ReportConfig = field(default_factory=ReportConfig.from_env)

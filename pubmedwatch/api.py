@@ -31,6 +31,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, quote, urlsplit
 
+from . import selfupdate
 from .config import Config
 from .downloads import inbox_relpath, organize_all, pdf_filename, pdf_relpath, safe_relpath, scan_pdf_dir
 from .http import redact
@@ -102,7 +103,8 @@ def handle(cfg: Config, storage: Storage, path: str, params: dict[str, str]) -> 
 
     if parts == ["health"]:
         last = storage.last_ok_run()
-        return ok({"status": "ok", "counts": storage.counts(), "last_ok_run": dict(last) if last else None})
+        return ok({"status": "ok", "counts": storage.counts(), "last_ok_run": dict(last) if last else None,
+                   "version": dict(selfupdate.running)})
     if parts == ["topics"]:
         return ok({"topics": [{"id": t.id, "label": t.label, "section": t.section, "query": t.query} for t in cfg.topics],
                    "sections": [{"id": s.id, "title": s.title, "style": s.style} for s in cfg.sections]})
