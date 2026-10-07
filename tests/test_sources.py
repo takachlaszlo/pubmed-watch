@@ -421,3 +421,37 @@ def test_a_long_link_search_does_not_lock_out_the_api(cfg, store):
 
     runner.refresh_links(cfg, http=Slow(cfg, openalex=OA), today=TODAY, force=True)
     assert outcome["write"] == "ok"
+
+
+def test_api_recovers_after_a_write_that_hit_a_busy_database(cfg, store, monkeypatch):
+    """A report refused while another writer holds the database must not poison the API's connection."""
+    import sqlite3 as sq
+    monkeypatch.setattr(Storage, "BUSY_TIMEOUT", 0.3)
+    put(store, "8", "10.1/eight")
+    cfg.api.port = 0
+    server = api.make_server(cfg, host="127.0.0.1", http=FakeStreamHttp())
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+
+    def report():
+        body = json.dumps({"pmid": "8", "status": "failed", "stage": "download", "error": "x"}).encode()
+        req = urllib.request.Request(base + "/downloads/report", data=body, method="POST",
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req) as resp:
+                return resp.status
+        except urllib.error.HTTPError as err:
+            return err.code
+
+    try:
+        urllib.request.urlopen(base + "/downloads?limit=1").read()  # the API connection has read something
+        blocker = sq.connect(cfg.data_dir / "pubmed.db")
+        blocker.execute("BEGIN IMMEDIATE")                  # e.g. the daily run writing
+        blocker.execute("UPDATE articles SET title=title || ' (frissítve)' WHERE pmid='8'")  # a real change
+        assert report() == 503                               # temporarily busy: a clear answer, not a crash
+        urllib.request.urlopen(base + "/downloads?limit=1").read()  # a read while the other writer is still at it
+        blocker.commit()
+        blocker.close()
+        assert report() == 200                               # and afterwards it works again, no restart needed
+    finally:
+        server.shutdown()

@@ -241,7 +241,15 @@ def make_server(cfg: Config, host: str = "0.0.0.0", http=None) -> ThreadingHTTPS
                     self._proxy_pdf(parts[2])
                     return
                 with lock:
-                    status, ctype, body = handle(cfg, storage, url.path, params)
+                    try:
+                        status, ctype, body = handle(cfg, storage, url.path, params)
+                    except Exception as exc:
+                        # a failed write leaves the connection inside a transaction with an old snapshot, which
+                        # would refuse every later write ("database is locked") until the next restart
+                        storage.db.rollback()
+                        if isinstance(exc, sqlite3.OperationalError) and "locked" in str(exc):
+                            raise ApiError(503, "az adatbázis épp foglalt, próbáld újra később")
+                        raise
             except ApiError as exc:
                 self._json_error(exc.status, str(exc))
                 return
@@ -270,10 +278,11 @@ def make_server(cfg: Config, host: str = "0.0.0.0", http=None) -> ThreadingHTTPS
                 with lock:
                     try:
                         status, ctype, body = handle_post(cfg, storage, url.path, payload)
-                    except sqlite3.OperationalError as exc:
-                        if "locked" not in str(exc):
-                            raise
-                        raise ApiError(503, "az adatbázis épp foglalt, próbáld újra később")
+                    except Exception as exc:
+                        storage.db.rollback()  # see do_GET: never keep a half-done transaction around
+                        if isinstance(exc, sqlite3.OperationalError) and "locked" in str(exc):
+                            raise ApiError(503, "az adatbázis épp foglalt, próbáld újra később")
+                        raise
             except ApiError as exc:
                 status, ctype = exc.status, "application/json; charset=utf-8"
                 body = json.dumps({"error": str(exc)}, ensure_ascii=False).encode()

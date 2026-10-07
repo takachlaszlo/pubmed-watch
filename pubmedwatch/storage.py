@@ -131,10 +131,12 @@ def now_iso() -> str:
 
 
 class Storage:
+    BUSY_TIMEOUT = 30  # seconds to wait for another writer
+
     def __init__(self, data_dir: Path | str):
         path = Path(data_dir)
         path.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(path / "pubmed.db", timeout=30, check_same_thread=False)
+        self.db = sqlite3.connect(path / "pubmed.db", timeout=self.BUSY_TIMEOUT, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
