@@ -49,6 +49,14 @@ def _once(cfg, name: str, value: str, action) -> None:
     marker.write_text(value, encoding="utf-8")
 
 
+def sources_signature(cfg) -> str:
+    """Which optional link sources are configured (names only, never the keys)."""
+    src = cfg.sources
+    enabled = {"unpaywall": src.unpaywall_email, "openalex": src.openalex_api_key, "elsevier": src.elsevier_api_key,
+               "wiley": src.wiley_tdm_token, "core": src.core_api_key, "preprints": cfg.downloads.preprints}
+    return "sources:" + ",".join(sorted(name for name, value in enabled.items() if value))
+
+
 def _startup_tasks(config_path: str | None) -> None:
     """Catch up on link / citation data after downtime, plus the optional one-time actions."""
     cfg = load_config(config_path)
@@ -68,6 +76,12 @@ def _startup_tasks(config_path: str | None) -> None:
             storage.close()
     except Exception:
         log.exception("a PDF-ek rendezése indításkor sikertelen")
+    # a newly configured source (a key added to the compose) searches all recent articles once, automatically
+    signature = sources_signature(cfg)
+    try:
+        _once(cfg, "link_refresh_sources", signature, lambda: refresh_links(cfg, force=True))
+    except Exception:
+        log.exception("a teljes linkfrissítés (új forrás) sikertelen")
     token = cfg.schedule.link_refresh_on_start
     if token:
         try:

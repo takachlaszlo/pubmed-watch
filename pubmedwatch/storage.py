@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .models import Article, Trial
-from .openaccess import AUTO_DOWNLOAD_SOURCES, PDF_SOURCE_RANK, OaLinks
+from .openaccess import AUTO_DOWNLOAD_SOURCES, PDF_SOURCE_RANK, OaLinks, PreprintLinks
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS articles (
     volume TEXT NOT NULL DEFAULT '',
     issue TEXT NOT NULL DEFAULT '',
     bibl_checked_at TEXT NOT NULL DEFAULT '',
+    author_emails TEXT NOT NULL DEFAULT '[]',      -- JSON [{name, email}] from PubMed affiliations
     kind TEXT NOT NULL DEFAULT 'other',
     is_update INTEGER NOT NULL DEFAULT 0,
     section TEXT NOT NULL DEFAULT '',
@@ -54,6 +55,14 @@ CREATE TABLE IF NOT EXISTS articles (
     url_fulltext TEXT NOT NULL DEFAULT '',
     url_pdf TEXT NOT NULL DEFAULT '',
     pdf_source TEXT NOT NULL DEFAULT '',
+    oa_status TEXT NOT NULL DEFAULT '',             -- gold | green | hybrid | bronze | diamond | closed
+    pdf_license TEXT NOT NULL DEFAULT '',
+    pdf_version TEXT NOT NULL DEFAULT '',           -- publishedVersion | acceptedVersion | submittedVersion
+    openalex_id TEXT NOT NULL DEFAULT '',
+    preprint_id TEXT NOT NULL DEFAULT '',           -- Europe PMC PPR id
+    preprint_doi TEXT NOT NULL DEFAULT '',
+    preprint_pdf TEXT NOT NULL DEFAULT '',
+    preprint_source TEXT NOT NULL DEFAULT '',       -- preprint (scriptable) | preprint-web (people only)
     oa_checked_at TEXT NOT NULL DEFAULT '',
     first_seen_at TEXT NOT NULL,
     first_seen_run INTEGER NOT NULL,
@@ -93,7 +102,8 @@ CREATE TABLE IF NOT EXISTS trials (
 CREATE INDEX IF NOT EXISTS trials_first_seen ON trials(first_seen_at);
 -- What happened to each PDF download. `ok` rows are permanent: an article is never downloaded twice.
 CREATE TABLE IF NOT EXISTS downloads (
-    pmid TEXT PRIMARY KEY,
+    pmid TEXT NOT NULL,
+    version TEXT NOT NULL DEFAULT 'vor',        -- vor (published article) | preprint
     status TEXT NOT NULL,                       -- ok | failed
     attempts INTEGER NOT NULL DEFAULT 0,
     first_attempt_at TEXT NOT NULL,
@@ -103,11 +113,16 @@ CREATE TABLE IF NOT EXISTS downloads (
     path TEXT NOT NULL DEFAULT '',
     bytes INTEGER,
     saved_at TEXT NOT NULL DEFAULT '',
-    source TEXT NOT NULL DEFAULT ''             -- n8n (reported) | disk (found in the PDF folder)
+    source TEXT NOT NULL DEFAULT '',            -- n8n (reported) | disk (found in the PDF folder)
+    PRIMARY KEY (pmid, version)
 );
 """
 
-JSON_ARTICLE = ("abstract", "authors", "pub_types", "mesh", "keywords")
+JSON_ARTICLE = ("abstract", "authors", "pub_types", "mesh", "keywords", "author_emails")
+NEW_ARTICLE_COLUMNS = ("volume", "issue", "bibl_checked_at", "author_emails", "oa_status", "pdf_license",
+                       "pdf_version", "openalex_id", "preprint_id", "preprint_doi", "preprint_pdf", "preprint_source")
+DOWNLOAD_COLUMNS = ("pmid", "version", "status", "attempts", "first_attempt_at", "last_attempt_at", "next_retry_at",
+                    "last_error", "path", "bytes", "saved_at", "source")
 JSON_TRIAL = ("phases", "countries", "conditions", "interventions")
 
 
@@ -128,9 +143,22 @@ class Storage:
 
     def _migrate(self) -> None:
         columns = {r[1] for r in self.db.execute("PRAGMA table_info(articles)")}
-        for name in ("volume", "issue", "bibl_checked_at"):
+        for name in NEW_ARTICLE_COLUMNS:
             if name not in columns:
-                self.db.execute(f"ALTER TABLE articles ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
+                default = "'[]'" if name == "author_emails" else "''"
+                self.db.execute(f"ALTER TABLE articles ADD COLUMN {name} TEXT NOT NULL DEFAULT {default}")
+        if "author_emails" not in columns:
+            # the e-mail addresses come with the PubMed record: re-read every article once
+            self.db.execute("UPDATE articles SET bibl_checked_at=''")
+        ledger = {r[1] for r in self.db.execute("PRAGMA table_info(downloads)")}
+        if ledger and "version" not in ledger:  # one row per article -> one row per article and version
+            self.db.executescript(
+                "ALTER TABLE downloads RENAME TO downloads_v1;"
+                + SCHEMA[SCHEMA.index("CREATE TABLE IF NOT EXISTS downloads"):]
+                + "INSERT INTO downloads (pmid, version, status, attempts, first_attempt_at, last_attempt_at, "
+                  "next_retry_at, last_error, path, bytes, saved_at, source) SELECT pmid, 'vor', status, attempts, "
+                  "first_attempt_at, last_attempt_at, next_retry_at, last_error, path, bytes, saved_at, source "
+                  "FROM downloads_v1; DROP TABLE downloads_v1;")
         self.db.commit()
 
     def close(self) -> None:
@@ -181,12 +209,13 @@ class Storage:
         self.db.execute(
             "INSERT INTO articles (pmid, title, abstract, authors, journal, journal_abbrev, pub_year, pub_date, "
             "entrez_date, pub_types, mesh, keywords, language, doi, pmcid, publication_status, volume, issue, "
-            "bibl_checked_at, kind, is_update, section, oa, url_fulltext, url_pdf, pdf_source, first_seen_at, "
-            "first_seen_run, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "bibl_checked_at, author_emails, kind, is_update, section, oa, url_fulltext, url_pdf, pdf_source, "
+            "first_seen_at, first_seen_run, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (a.pmid, a.title, json.dumps(a.abstract, ensure_ascii=False), json.dumps(a.authors, ensure_ascii=False),
              a.journal, a.journal_abbrev, a.pub_year, a.pub_date, a.entrez_date,
              json.dumps(a.pub_types), json.dumps(a.mesh, ensure_ascii=False), json.dumps(a.keywords, ensure_ascii=False),
-             a.language, a.doi, a.pmcid, a.publication_status, a.volume, a.issue, ts, a.kind, int(a.is_update),
+             a.language, a.doi, a.pmcid, a.publication_status, a.volume, a.issue, ts,
+             json.dumps(a.author_emails, ensure_ascii=False), a.kind, int(a.is_update),
              section, int(a.oa),
              a.url_fulltext, a.url_pdf, a.pdf_source, ts, run_id, ts))
 
@@ -223,21 +252,87 @@ class Storage:
         return [(r[0], r[1], r[2], r[3]) for r in self.db.execute(sql, args)]
 
     def update_oa(self, pmid: str, links: OaLinks) -> bool:
-        """Stores newly found links; a better PDF source replaces a weaker one. True if something changed."""
-        row = self.db.execute("SELECT oa, pmcid, url_fulltext, url_pdf, pdf_source FROM articles WHERE pmid=?",
-                              (pmid,)).fetchone()
+        """Stores newly found links and provenance; a better PDF source replaces a weaker one (licence and version
+        travel with the PDF they describe). True if something changed (then `updated_at` moves)."""
+        row = self.db.execute("SELECT oa, pmcid, url_fulltext, url_pdf, pdf_source, oa_status, pdf_license, "
+                              "pdf_version, openalex_id, preprint_id FROM articles WHERE pmid=?", (pmid,)).fetchone()
         if row is None:
             return False
         better_pdf = bool(links.url_pdf) and (PDF_SOURCE_RANK.get(links.pdf_source, 9)
                                               < PDF_SOURCE_RANK.get(row["pdf_source"], 9) or not row["url_pdf"])
-        url_pdf = links.url_pdf if better_pdf else row["url_pdf"]
-        pdf_source = links.pdf_source if better_pdf else row["pdf_source"]
-        new = (int(links.oa or row["oa"]), links.pmcid or row["pmcid"], row["url_fulltext"] or links.url_fulltext,
-               url_pdf, pdf_source)
+        describes_pdf = better_pdf or (bool(links.url_pdf) and links.url_pdf == row["url_pdf"])
+        new = (
+            int(links.oa or row["oa"]),
+            links.pmcid or row["pmcid"],
+            row["url_fulltext"] or links.url_fulltext,
+            links.url_pdf if better_pdf else row["url_pdf"],
+            links.pdf_source if better_pdf else row["pdf_source"],
+            # a definite OA status beats none; "closed" never overrides an open one found elsewhere
+            links.oa_status if links.oa_status and (not row["oa_status"] or row["oa_status"] == "closed") else row["oa_status"],
+            links.license if describes_pdf and links.license else row["pdf_license"],
+            links.version if describes_pdf and links.version else row["pdf_version"],
+            links.openalex_id or row["openalex_id"],
+            links.preprint_id or row["preprint_id"],
+        )
         if new == tuple(row):
             return False
-        self.db.execute("UPDATE articles SET oa=?, pmcid=?, url_fulltext=?, url_pdf=?, pdf_source=?, updated_at=? "
-                        "WHERE pmid=?", (*new, now_iso(), pmid))
+        self.db.execute("UPDATE articles SET oa=?, pmcid=?, url_fulltext=?, url_pdf=?, pdf_source=?, oa_status=?, "
+                        "pdf_license=?, pdf_version=?, openalex_id=?, preprint_id=?, updated_at=? WHERE pmid=?",
+                        (*new, now_iso(), pmid))
+        return True
+
+    def missing_provenance(self, since_iso: str) -> list[tuple[str, str, str, str, str]]:
+        """(pmid, doi, pmcid, url_pdf, pdf_source) of articles with a downloadable PDF but no licence or OA status yet
+        (found before provenance was recorded)."""
+        marks = ",".join("?" * len(AUTO_DOWNLOAD_SOURCES))
+        rows = self.db.execute(f"SELECT pmid, doi, pmcid, url_pdf, pdf_source FROM articles WHERE pdf_source IN ({marks}) "
+                               f"AND (pdf_license='' OR oa_status='') AND first_seen_at>=?", (*AUTO_DOWNLOAD_SOURCES, since_iso))
+        return [tuple(r) for r in rows]
+
+    def without_oa_status(self, pmids: Iterable[str]) -> list[str]:
+        out = []
+        for pmid in pmids:
+            row = self.db.execute("SELECT oa_status FROM articles WHERE pmid=?", (pmid,)).fetchone()
+            if row is not None and not row[0]:
+                out.append(pmid)
+        return out
+
+    def pdf_links(self, pmids: Iterable[str]) -> dict[str, str]:
+        """pmid -> the stored PDF link (for proxy sources the link a person can open)."""
+        out: dict[str, str] = {}
+        for pmid in pmids:
+            row = self.db.execute("SELECT url_pdf FROM articles WHERE pmid=?", (pmid,)).fetchone()
+            if row and row[0]:
+                out[pmid] = row[0]
+        return out
+
+    def preprint_ids(self, pmids: Iterable[str]) -> dict[str, str]:
+        """pmid -> Europe PMC preprint id, for articles whose preprint is not yet known to be downloadable."""
+        out: dict[str, str] = {}
+        for pmid in pmids:
+            row = self.db.execute("SELECT preprint_id FROM articles WHERE pmid=? AND preprint_id<>'' "
+                                  "AND preprint_source<>'preprint'", (pmid,)).fetchone()
+            if row:
+                out[pmid] = row[0]
+        return out
+
+    def update_preprint(self, pmid: str, links: PreprintLinks) -> bool:
+        """Stores the preprint of an article. `updated_at` moves only when a downloadable preprint appears, so the
+        next download run sees it."""
+        row = self.db.execute("SELECT preprint_id, preprint_doi, preprint_pdf, preprint_source FROM articles "
+                              "WHERE pmid=?", (pmid,)).fetchone()
+        if row is None:
+            return False
+        if links.source != "preprint" and row["preprint_source"] == "preprint":
+            return False  # keep the downloadable copy found earlier
+        new = (links.preprint_id or row["preprint_id"], links.doi or row["preprint_doi"],
+               links.url_pdf or row["preprint_pdf"], links.source or row["preprint_source"])
+        if new == tuple(row):
+            return False
+        newly_downloadable = new[3] == "preprint" and row["preprint_source"] != "preprint"
+        self.db.execute("UPDATE articles SET preprint_id=?, preprint_doi=?, preprint_pdf=?, preprint_source=?"
+                        + (", updated_at=?" if newly_downloadable else "") + " WHERE pmid=?",
+                        (*new, *((now_iso(),) if newly_downloadable else ()), pmid))
         return True
 
     def mark_oa_checked(self, pmids: Iterable[str]) -> None:
@@ -258,89 +353,114 @@ class Storage:
 
     def update_bibliography(self, a: Article) -> None:
         self.db.execute("UPDATE articles SET volume=?, issue=?, pub_date=?, pub_year=?, publication_status=?, "
-                        "bibl_checked_at=? WHERE pmid=?",
-                        (a.volume, a.issue, a.pub_date, a.pub_year, a.publication_status, now_iso(), a.pmid))
+                        "author_emails=?, bibl_checked_at=? WHERE pmid=?",
+                        (a.volume, a.issue, a.pub_date, a.pub_year, a.publication_status,
+                         json.dumps(a.author_emails, ensure_ascii=False), now_iso(), a.pmid))
 
     def mark_bibliography_checked(self, pmids: Iterable[str]) -> None:
         ts = now_iso()
         self.db.executemany("UPDATE articles SET bibl_checked_at=? WHERE pmid=?", [(ts, p) for p in pmids])
 
     # --- downloads ledger ---------------------------------------------------------------------
-    def downloads_due(self, now: datetime, hours: int, retry_for_days: int, path_for) -> list[dict]:
-        """Articles an automated download should be attempted for right now.
+    def downloads_due(self, now: datetime, hours: int, retry_for_days: int, path_for,
+                      sections: list[str] | None = None, kinds: list[str] | None = None,
+                      preprints: bool = True) -> list[dict]:
+        """What an automated download should be attempted for right now, newest first.
 
-        - new: a PDF link a script may fetch, never attempted, that appeared (or was found) within `hours`;
-        - retry: attempted and failed, and the monthly retry is due (within `retry_for_days` of the first try);
-        - relinked: failed earlier, but the PDF link changed since the last attempt, so it deserves a new try.
-        Anything already downloaded (`ok`) is never offered again."""
-        marks = ",".join("?" * len(AUTO_DOWNLOAD_SOURCES))
+        Published version (vor), from a source a script may fetch:
+        - new: never attempted, the PDF appeared (or was found) within `hours`;
+        - retry: failed earlier and the monthly retry is due (within `retry_for_days` of the first attempt);
+        - relinked: failed earlier, but the PDF link changed since, so it deserves a new try.
+        Preprint (only when no downloadable published version exists and it was not downloaded): same rules.
+        Anything downloaded once (`ok`) is never offered again. `sections` / `kinds` narrow the choice (empty = all).
+        `path_for(article, version)` -> {"path", "final_path", "url"}."""
         stamp = lambda dt: dt.isoformat(timespec="seconds")  # noqa: E731
-        # path_for(article) -> {"path": where n8n saves it (inbox), "final_path": where it ends up}
+        marks = ",".join("?" * len(AUTO_DOWNLOAD_SOURCES))
+        scope, scope_args = "", []
+        if sections:
+            scope += f" AND a.section IN ({','.join('?' * len(sections))})"
+            scope_args += list(sections)
+        if kinds:
+            scope += f" AND a.kind IN ({','.join('?' * len(kinds))})"
+            scope_args += list(kinds)
+        window = stamp(now - timedelta(hours=hours))
+        horizon = stamp(now - timedelta(days=retry_for_days))
+        channels = [("vor", f"a.url_pdf<>'' AND a.pdf_source IN ({marks})", list(AUTO_DOWNLOAD_SOURCES))]
+        if preprints:
+            channels.append(("preprint",
+                             f"a.preprint_source='preprint' AND a.preprint_pdf<>'' AND a.pdf_source NOT IN ({marks}) "
+                             f"AND NOT EXISTS (SELECT 1 FROM downloads v WHERE v.pmid=a.pmid AND v.version='vor' "
+                             f"AND v.status='ok')", list(AUTO_DOWNLOAD_SOURCES)))
         due: list[dict] = []
-        new_rows = self.db.execute(
-            f"SELECT a.* FROM articles a LEFT JOIN downloads d ON d.pmid=a.pmid WHERE d.pmid IS NULL "
-            f"AND a.url_pdf<>'' AND a.pdf_source IN ({marks}) AND datetime(a.updated_at) >= datetime(?) "
-            f"ORDER BY a.pmid", (*AUTO_DOWNLOAD_SOURCES, stamp(now - timedelta(hours=hours))))
-        for row in new_rows:
-            due.append(self._with_download(row, "new", 0, "", path_for))
-        retry_rows = self.db.execute(
-            f"SELECT a.*, d.attempts AS d_attempts, d.last_error AS d_error, "
-            f"(datetime(d.next_retry_at) <= datetime(?)) AS d_monthly "
-            f"FROM downloads d JOIN articles a ON a.pmid=d.pmid WHERE d.status='failed' AND a.url_pdf<>'' "
-            f"AND a.pdf_source IN ({marks}) AND datetime(d.first_attempt_at) >= datetime(?) "
-            f"AND (datetime(d.next_retry_at) <= datetime(?) OR datetime(a.updated_at) > datetime(d.last_attempt_at)) "
-            f"ORDER BY a.pmid", (stamp(now), *AUTO_DOWNLOAD_SOURCES, stamp(now - timedelta(days=retry_for_days)),
-                                 stamp(now)))
-        for row in retry_rows:
-            due.append(self._with_download(row, "retry" if row["d_monthly"] else "relinked", row["d_attempts"],
-                                           row["d_error"], path_for))
+        for version, has_link, link_args in channels:
+            for row in self.db.execute(
+                    f"SELECT a.* FROM articles a LEFT JOIN downloads d ON d.pmid=a.pmid AND d.version=? "
+                    f"WHERE d.pmid IS NULL AND {has_link} AND datetime(a.updated_at) >= datetime(?){scope} "
+                    f"ORDER BY a.updated_at DESC, a.pmid", (version, *link_args, window, *scope_args)):
+                due.append(self._with_download(row, version, "new", 0, "", path_for))
+            for row in self.db.execute(
+                    f"SELECT a.*, d.attempts AS d_attempts, d.last_error AS d_error, "
+                    f"(datetime(d.next_retry_at) <= datetime(?)) AS d_monthly FROM downloads d "
+                    f"JOIN articles a ON a.pmid=d.pmid WHERE d.version=? AND d.status='failed' AND {has_link} "
+                    f"AND datetime(d.first_attempt_at) >= datetime(?) AND (datetime(d.next_retry_at) <= datetime(?) "
+                    f"OR datetime(a.updated_at) > datetime(d.last_attempt_at)){scope} ORDER BY a.pmid",
+                    (stamp(now), version, *link_args, horizon, stamp(now), *scope_args)):
+                due.append(self._with_download(row, version, "retry" if row["d_monthly"] else "relinked",
+                                               row["d_attempts"], row["d_error"], path_for))
         return due
 
-    def _with_download(self, row: sqlite3.Row, reason: str, attempts: int, last_error: str, path_for) -> dict:
+    def _with_download(self, row: sqlite3.Row, version: str, reason: str, attempts: int, last_error: str,
+                       path_for) -> dict:
         article = self.article_dict(row)
         for extra in ("d_attempts", "d_error", "d_monthly"):
             article.pop(extra, None)
-        article["download"] = {"reason": reason, "attempts": attempts, "last_error": last_error,
-                               **path_for(article)}
+        article["download"] = {"version": version, "reason": reason, "attempts": attempts, "last_error": last_error,
+                               **path_for(article, version)}
         return article
 
+    def _ledger_row(self, pmid: str, version: str) -> sqlite3.Row | None:
+        return self.db.execute("SELECT * FROM downloads WHERE pmid=? AND version=?", (pmid, version)).fetchone()
+
+    def _ledger_write(self, values: dict) -> None:
+        self.db.execute(f"INSERT OR REPLACE INTO downloads ({', '.join(DOWNLOAD_COLUMNS)}) "
+                        f"VALUES ({', '.join('?' * len(DOWNLOAD_COLUMNS))})", [values[c] for c in DOWNLOAD_COLUMNS])
+
     def report_download(self, pmid: str, status: str, now: datetime, retry_every_days: int, path: str = "",
-                        size: int | None = None, error: str = "", retry_in_days: int | None = None) -> dict:
+                        size: int | None = None, error: str = "", retry_in_days: int | None = None,
+                        version: str = "vor") -> dict:
         """Records the outcome of one attempt. `ok` is final; `failed` schedules the next try: monthly by default
         (`retry_every_days`), or after `retry_in_days` for local problems such as an unwritable folder."""
         ts = now.isoformat(timespec="seconds")
-        row = self.db.execute("SELECT * FROM downloads WHERE pmid=?", (pmid,)).fetchone()
+        row = self._ledger_row(pmid, version)
         if row is not None and row["status"] == "ok":
             return dict(row)  # a late failure report must never undo a success
-        attempts = (row["attempts"] if row else 0) + 1
-        first = row["first_attempt_at"] if row else ts
+        values = {"pmid": pmid, "version": version, "attempts": (row["attempts"] if row else 0) + 1,
+                  "first_attempt_at": row["first_attempt_at"] if row else ts, "last_attempt_at": ts, "source": "n8n"}
         if status == "ok":
-            values = ("ok", attempts, first, ts, "", "", path, size, ts, "n8n")
+            values.update(status="ok", next_retry_at="", last_error="", path=path, bytes=size, saved_at=ts)
         else:
             retry_at = (now + timedelta(days=retry_in_days or retry_every_days)).isoformat(timespec="seconds")
-            values = ("failed", attempts, first, ts, retry_at, error[:300], "", None, "", "n8n")
-        self.db.execute(
-            "INSERT OR REPLACE INTO downloads (pmid, status, attempts, first_attempt_at, last_attempt_at, "
-            "next_retry_at, last_error, path, bytes, saved_at, source) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (pmid, *values))
+            values.update(status="failed", next_retry_at=retry_at, last_error=error[:300], path="", bytes=None,
+                          saved_at="")
+        self._ledger_write(values)
         self.db.commit()
-        return dict(self.db.execute("SELECT * FROM downloads WHERE pmid=?", (pmid,)).fetchone())
+        return dict(self._ledger_row(pmid, version))
 
-    def reconcile_downloads(self, files: Iterable[tuple[str, str, int, str]], now: datetime) -> int:
-        """Marks articles `ok` whose PDF is already in the PDF folder (name carries the PMID). Returns how many
-        were newly marked. Second protection against downloading something twice, independent of n8n's reports."""
+    def reconcile_downloads(self, files: Iterable[tuple[str, str, str, int, str]], now: datetime) -> int:
+        """Marks articles `ok` whose PDF is already in the PDF folder: (pmid, version, path, size, modified) as found
+        by the file names. Returns how many were newly marked. Second protection against downloading twice,
+        independent of n8n's reports."""
         ts = now.isoformat(timespec="seconds")
         marked = 0
-        for pmid, relpath, size, modified in files:
-            row = self.db.execute("SELECT status, attempts, first_attempt_at FROM downloads WHERE pmid=?",
-                                  (pmid,)).fetchone()
+        for pmid, version, relpath, size, modified in files:
+            row = self._ledger_row(pmid, version)
             if row is not None and row["status"] == "ok":
                 continue
-            self.db.execute(
-                "INSERT OR REPLACE INTO downloads (pmid, status, attempts, first_attempt_at, last_attempt_at, "
-                "next_retry_at, last_error, path, bytes, saved_at, source) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                (pmid, "ok", row["attempts"] if row else 0, row["first_attempt_at"] if row else modified, ts, "", "",
-                 relpath, size, modified, "disk"))
+            self._ledger_write({"pmid": pmid, "version": version, "status": "ok",
+                                "attempts": row["attempts"] if row else 0,
+                                "first_attempt_at": row["first_attempt_at"] if row else modified,
+                                "last_attempt_at": ts, "next_retry_at": "", "last_error": "", "path": relpath,
+                                "bytes": size, "saved_at": modified, "source": "disk"})
             marked += 1
         if marked:
             self.db.commit()
@@ -356,9 +476,9 @@ class Storage:
         sql += " ORDER BY d.last_attempt_at DESC, d.pmid LIMIT ? OFFSET ?"
         return [dict(r) for r in self.db.execute(sql, (*args, limit, offset))]
 
-    def downloads_to_organize(self, only_pmid: str | None = None) -> list[tuple[str, str, dict]]:
-        """(pmid, path the ledger says the PDF is at, article) for downloaded articles we know the citation of."""
-        sql = ("SELECT a.*, d.path AS d_path FROM downloads d JOIN articles a ON a.pmid=d.pmid "
+    def downloads_to_organize(self, only_pmid: str | None = None) -> list[tuple[str, str, str, dict]]:
+        """(pmid, version, path the ledger says the PDF is at, article) for downloaded articles we know."""
+        sql = ("SELECT a.*, d.path AS d_path, d.version AS d_version FROM downloads d JOIN articles a ON a.pmid=d.pmid "
                "WHERE d.status='ok' AND d.path<>''")
         args: list = []
         if only_pmid:
@@ -366,14 +486,15 @@ class Storage:
             args.append(only_pmid)
         out = []
         for row in self.db.execute(sql, args):
-            current = row["d_path"]
+            current, version = row["d_path"], row["d_version"]
             article = self.article_dict(row)
             article.pop("d_path", None)
-            out.append((article["pmid"], current, article))
+            article.pop("d_version", None)
+            out.append((article["pmid"], version, current, article))
         return out
 
-    def set_download_path(self, pmid: str, path: str) -> None:
-        self.db.execute("UPDATE downloads SET path=? WHERE pmid=?", (path, pmid))
+    def set_download_path(self, pmid: str, path: str, version: str = "vor") -> None:
+        self.db.execute("UPDATE downloads SET path=? WHERE pmid=? AND version=?", (path, pmid, version))
 
     def has_article(self, pmid: str) -> bool:
         return self.db.execute("SELECT 1 FROM articles WHERE pmid=?", (pmid,)).fetchone() is not None
@@ -395,6 +516,10 @@ class Storage:
             "fulltext": d.pop("url_fulltext"),
             "pdf": d.pop("url_pdf"),
         }
+        if "preprint_id" in d:
+            d["preprint"] = {"id": d.pop("preprint_id"), "doi": d.pop("preprint_doi"), "pdf": d.pop("preprint_pdf"),
+                             "source": d.pop("preprint_source")}
+            d["links"]["preprint_pdf"] = d["preprint"]["pdf"]
         return d
 
     def articles(self, *, run_id: int | None = None, since: str | None = None, updated_since: str | None = None,

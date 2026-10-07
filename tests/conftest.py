@@ -53,8 +53,14 @@ class FakeHttp:
 
     def __init__(self, cfg, topic_hits: dict[str, list[str]] | None = None, trials: dict | None = None,
                  europepmc: dict | None = None, fail_search: bool = False, s3_pmcids: tuple[str, ...] = (),
-                 unpaywall: dict | None = None, pdf_hosts: tuple[str, ...] = ()):
+                 unpaywall: dict | None = None, pdf_hosts: tuple[str, ...] = (), openalex: dict | None = None,
+                 elsevier_entitled: tuple[str, ...] = (), core: dict | None = None, preprints: dict | None = None):
         self.s3_pmcids = s3_pmcids
+        self.openalex = openalex or {"results": []}  # OpenAlex /works answer
+        self.elsevier_entitled = {d.lower() for d in elsevier_entitled}
+        self.core = core or {}  # DOI -> CORE search answer
+        self.preprints = preprints or {"resultList": {"result": []}}  # Europe PMC SRC:PPR answer
+        self.headers_seen: list[dict] = []
         self.unpaywall = unpaywall or {}  # DOI -> Unpaywall answer; anything else is a closed article
         self.pdf_hosts = pdf_hosts  # hosts that really hand a PDF to a script; the rest answer 403
         self.probes: list[str] = []
@@ -83,10 +89,20 @@ class FakeHttp:
             return FakeResponse(content=ET.tostring(root))
         raise AssertionError(f"váratlan kérés: {method} {url}")
 
-    def get_json(self, url, params=None):
+    def get_json(self, url, params=None, headers=None):
         self.calls.append(("GET", url, params or {}))
+        self.headers_seen.append(headers or {})
         if "europepmc" in url:
-            return self.europepmc
+            return self.preprints if "SRC:PPR" in (params or {}).get("query", "") else self.europepmc
+        if "api.openalex.org" in url:
+            return self.openalex
+        if "api.elsevier.com/content/article/entitlement" in url:
+            from urllib.parse import unquote
+            doi = unquote(url.rsplit("/doi/", 1)[1]).lower()
+            return {"entitlement-response": {"document-entitlement": {"entitled": doi in self.elsevier_entitled}}}
+        if "api.core.ac.uk" in url:
+            doi = (params or {}).get("q", "").split('"')[1]
+            return self.core.get(doi, {"results": []})
         if "clinicaltrials.gov" in url:
             return self.trials
         if "unpaywall" in url:
@@ -94,8 +110,9 @@ class FakeHttp:
             return self.unpaywall.get(unquote(url.split("/v2/", 1)[1]), {"is_oa": False})
         raise AssertionError(f"váratlan kérés: GET {url}")
 
-    def probe(self, url, nbytes=8):
+    def probe(self, url, nbytes=8, headers=None):
         self.probes.append(url)
+        self.headers_seen.append(headers or {})
         host = urlsplit(url).hostname
         return (200, b"%PDF-1.7") if host in self.pdf_hosts else (403, b"<!DOCTYPE")
 

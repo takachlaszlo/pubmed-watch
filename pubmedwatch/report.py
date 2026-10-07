@@ -5,6 +5,7 @@ import html
 import re
 from dataclasses import dataclass
 from datetime import date
+from urllib.parse import quote, urlencode
 
 from .config import GUIDELINE_SECTION, Config, Section
 
@@ -95,7 +96,33 @@ def _link(href: str, text: str, strong: bool = False) -> str:
     return f'<a href="{_e(href)}" style="{style}">{_e(text)}</a>'
 
 
-def _links(a: dict, size: int) -> str:
+def author_request_link(cfg: Config, a: dict) -> str:
+    """mailto: link asking the author (whose e-mail PubMed lists) for the full text; '' if no address is known."""
+    contacts = a.get("author_emails") or []
+    if not contacts:
+        return ""
+    contact = contacts[0]
+    surname = (contact.get("name") or "").split(" ")[0]
+    cite = " ".join(x for x in (first_author(a["authors"]), a.get("journal_abbrev") or "", a.get("pub_year") or "") if x)
+    body = (f"Dear Dr {surname},\n\nI read the abstract of your article \"{a['title']}\" ({cite}"
+            + (f", doi:{a['doi']}" if a.get("doi") else "")
+            + ") with great interest. As I do not have access to the full text, could you kindly send me a PDF copy "
+              "for my personal research use?\n\nThank you very much in advance.\n\nKind regards,\n"
+            + (cfg.report.request_signature or ""))
+    query = urlencode({"subject": f"Full-text request: {a['title'][:150]}", "body": body}, quote_via=quote)
+    return f"mailto:{contact['email']}?{query}"
+
+
+def library_link(cfg: Config, a: dict) -> str:
+    """The library's access link from LIBRARY_LINK_TEMPLATE ({doi}, {pmid}, {title}); '' if none is configured."""
+    template = cfg.report.library_link
+    if not template or ("{doi}" in template and not a.get("doi")):
+        return ""
+    return (template.replace("{doi}", quote(a.get("doi") or "", safe="/"))
+                    .replace("{pmid}", a["pmid"]).replace("{title}", quote(a.get("title") or "")))
+
+
+def _links(cfg: Config, a: dict, size: int) -> str:
     links = a["links"]
     parts = [_link(links["pubmed"], "PubMed")]
     if links["doi"]:
@@ -104,6 +131,12 @@ def _links(a: dict, size: int) -> str:
         parts.append(_link(links["fulltext"], "Teljes szöveg"))
     if links["pdf"]:
         parts.append(_link(links["pdf"], "PDF ↓", strong=True))
+    if links.get("preprint_pdf"):
+        parts.append(_link(links["preprint_pdf"], "Preprint ↓ (nem lektorált)"))
+    if not links["pdf"] and not links["fulltext"]:  # no free copy: the legal ways a person can still get it
+        for href, label in ((author_request_link(cfg, a), "Szerző megkérése"), (library_link(cfg, a), "Könyvtár")):
+            if href:
+                parts.append(_link(href, label))
     return f'<div style="font-size:{size}px;margin-top:4px;">{" · ".join(parts)}</div>'
 
 
@@ -116,6 +149,10 @@ def _full_item(cfg: Config, a: dict, show_topics: bool) -> str:
                                   _e(a["pub_year"])) if x)
     tags = _tag("Frissített", warn=True) if a["is_update"] else ""
     tags += "".join(_tag(t) for t in type_labels(a))
+    if a.get("pdf_version") == "acceptedVersion" and a["links"]["pdf"]:
+        tags += _tag("PDF: elfogadott kézirat")
+    if a["links"].get("preprint_pdf") and not a["links"]["pdf"]:
+        tags += _tag("Csak preprint (nem lektorált)", warn=True)
     if show_topics:
         trial_sections = {s.id for s in cfg.sections if s.style == "trials"}
         tags += "".join(_tag(t.label) for t in cfg.topics if t.id in a["topics"] and t.section not in trial_sections)
@@ -127,16 +164,16 @@ def _full_item(cfg: Config, a: dict, show_topics: bool) -> str:
         inner += f'<div style="margin-top:6px;">{tags}</div>'
     if concl:
         inner += f'<div style="font-size:13px;line-height:19px;color:{C["ink"]};margin-top:7px;">{_e(concl)}</div>'
-    return _row(inner + _links(a, 12))
+    return _row(inner + _links(cfg, a, 12))
 
 
-def _compact_item(a: dict) -> str:
+def _compact_item(cfg: Config, a: dict) -> str:
     extra = [t for t in type_labels(a) if t in ("Metaanalízis", "Irányelv")]
     meta = f'<i>{_e(a["journal_abbrev"] or a["journal"])}</i>' + ("".join(f" · {_e(t)}" for t in extra))
     inner = (f'<a href="{_e(a["links"]["pubmed"])}" style="color:{C["ink"]};text-decoration:none;font-size:14px;'
              f'line-height:19px;">{_e(a["title"])}</a>'
              f'<div style="font-size:12px;color:{C["muted"]};margin-top:2px;">{meta}</div>')
-    return _row(inner + _links(a, 11), "8px 0")
+    return _row(inner + _links(cfg, a, 11), "8px 0")
 
 
 def _trial_item(t: dict) -> str:
@@ -165,7 +202,7 @@ def _section_html(cfg: Config, s: Section, g: dict) -> str:
     if s.style == "full":
         rows = "".join(_full_item(cfg, a, show_topics=s.id == GUIDELINE_SECTION) for a in g["articles"])
     elif s.style == "compact":
-        rows = "".join(_compact_item(a) for a in g["articles"])
+        rows = "".join(_compact_item(cfg, a) for a in g["articles"])
     else:
         rows = "".join(_trial_item(t) for t in g["trials"]) + "".join(_full_item(cfg, a, False) for a in g["articles"])
     if not rows:
@@ -249,7 +286,8 @@ def build_text(cfg: Config, day: date, groups: dict[str, dict], lead: str) -> st
         for a in g["articles"]:
             flag = "[FRISSÍTETT] " if a["is_update"] else ""
             lines += ["", f"* {flag}{a['title']}", f"  {first_author(a['authors'])} · {a['journal_abbrev']} · {a['pub_year']}"]
-            for name, key in (("PubMed", "pubmed"), ("DOI", "doi"), ("PDF", "pdf")):
-                if a["links"][key]:
+            for name, key in (("PubMed", "pubmed"), ("DOI", "doi"), ("PDF", "pdf"),
+                              ("Preprint (nem lektorált)", "preprint_pdf")):
+                if a["links"].get(key):
                     lines.append(f"  {name}: {a['links'][key]}")
     return "\n".join(lines) + "\n"

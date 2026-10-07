@@ -24,6 +24,8 @@ class Article:
     publication_status: str = ""  # aheadofprint | epublish | ppublish ...
     volume: str = ""  # empty while the article is online ahead of print
     issue: str = ""
+    # authors whose affiliation in PubMed carries an e-mail address (usually the corresponding author)
+    author_emails: list[dict] = field(default_factory=list)  # [{"name": "Piraux A", "email": "..."}]
     # derived
     kind: str = "other"  # guideline | systematic_review | protocol | rct | review | other
     is_update: bool = False

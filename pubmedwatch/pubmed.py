@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import xml.etree.ElementTree as ET
 from datetime import date
 
@@ -12,6 +13,7 @@ log = logging.getLogger(__name__)
 
 EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
 FETCH_BATCH = 200
+EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
 MONTHS = {m: i for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
 
 
@@ -85,11 +87,20 @@ def parse_article(node: ET.Element) -> Article | None:
     pmid = cit.findtext("PMID") or ""
 
     authors = []
+    author_emails: list[dict] = []
     for a in art.findall("AuthorList/Author"):
         if a.find("CollectiveName") is not None:
-            authors.append(_text(a.find("CollectiveName")))
+            name = _text(a.find("CollectiveName"))
         elif a.findtext("LastName"):
-            authors.append(f"{a.findtext('LastName')} {a.findtext('Initials') or ''}".strip())
+            name = f"{a.findtext('LastName')} {a.findtext('Initials') or ''}".strip()
+        else:
+            continue
+        authors.append(name)
+        for aff in a.findall("AffiliationInfo/Affiliation"):
+            for email in EMAIL.findall(_text(aff)):
+                email = email.rstrip(".").lower()
+                if email not in [e["email"] for e in author_emails]:
+                    author_emails.append({"name": name, "email": email})
 
     journal = art.find("Journal")
     issue_date = _date(journal.find("JournalIssue/PubDate")) if journal is not None else ""
@@ -116,6 +127,7 @@ def parse_article(node: ET.Element) -> Article | None:
         doi=ids.get("doi", ""),
         pmcid=ids.get("pmc", ""),
         publication_status=node.findtext("PubmedData/PublicationStatus") or "",
+        author_emails=author_emails,
         volume=_text(journal.find("JournalIssue/Volume")) if journal is not None else "",
         issue=_text(journal.find("JournalIssue/Issue")) if journal is not None else "",
     )

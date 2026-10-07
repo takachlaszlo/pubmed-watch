@@ -1,0 +1,774 @@
+{
+ "meta": {
+  "count": 3,
+  "db_response_time_ms": 14,
+  "page": 1,
+  "per_page": 50,
+  "groups_count": null,
+  "x_query": {
+   "oql": "get works where DOI is (\n    10.1016/j.dcn.2026.101830\n    or 10.1016/j.jphys.2026.08.013\n    or 10.1016/j.pedneo.2026.06.006\n    or 10.1080/25787489.2026.2739699\n    or 10.1136/bjo-2026-329816\n  )",
+   "oqo": {
+    "get_rows": "works",
+    "filter_rows": [
+     {
+      "join": "or",
+      "filters": [
+       {
+        "column_id": "doi",
+        "value": "10.1016/j.dcn.2026.101830"
+       },
+       {
+        "column_id": "doi",
+        "value": "10.1016/j.jphys.2026.08.013"
+       },
+       {
+        "column_id": "doi",
+        "value": "10.1016/j.pedneo.2026.06.006"
+       },
+       {
+        "column_id": "doi",
+        "value": "10.1080/25787489.2026.2739699"
+       },
+       {
+        "column_id": "doi",
+        "value": "10.1136/bjo-2026-329816"
+       }
+      ]
+     }
+    ]
+   },
+   "url": "/works?filter=doi:10.1016%2Fj.dcn.2026.101830|10.1016%2Fj.jphys.2026.08.013|10.1016%2Fj.pedneo.2026.06.006|10.1080%2F25787489.2026.2739699|10.1136%2Fbjo-2026-329816&per_page=50"
+  },
+  "cost_usd": 0.0001
+ },
+ "results": [
+  {
+   "id": "https://openalex.org/W7213638009",
+   "doi": "https://doi.org/10.1016/j.pedneo.2026.06.006",
+   "title": "Application of Procalcitonin in Pediatric Emergency and Critical Care Settings",
+   "display_name": "Application of Procalcitonin in Pediatric Emergency and Critical Care Settings",
+   "publication_year": 2026,
+   "publication_date": "2026-09-01",
+   "ids": {
+    "openalex": "https://openalex.org/W7213638009",
+    "doi": "https://doi.org/10.1016/j.pedneo.2026.06.006"
+   },
+   "language": "en",
+   "primary_location": {
+    "id": "doi:10.1016/j.pedneo.2026.06.006",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.1016/j.pedneo.2026.06.006",
+    "pdf_url": "https://www.pediatr-neonatol.com/article/S1875-9572(26)00143-9/pdf",
+    "source": {
+     "id": "https://openalex.org/S183831342",
+     "display_name": "Pediatrics & Neonatology",
+     "issn_l": "1875-9572",
+     "issn": [
+      "1875-9572",
+      "2212-1692"
+     ],
+     "is_oa": true,
+     "is_in_doaj": true,
+     "is_core": true,
+     "listed_in": [
+      "cwts-core",
+      "doaj",
+      "doyens",
+      "jufo-1",
+      "medline"
+     ],
+     "host_organization": "https://openalex.org/P4310320990",
+     "host_organization_name": "Elsevier BV",
+     "host_organization_lineage": [
+      "https://openalex.org/P4310320990"
+     ],
+     "host_organization_lineage_names": [
+      "Elsevier BV"
+     ],
+     "type": "journal"
+    },
+    "license": "cc-by-nc-nd",
+    "license_id": "https://openalex.org/licenses/cc-by-nc-nd",
+    "version": "publishedVersion",
+    "is_accepted": true,
+    "is_published": true,
+    "raw_source_name": "Pediatrics &amp; Neonatology",
+    "raw_type": "journal-article"
+   },
+   "type": "article",
+   "indexed_in": [
+    "crossref",
+    "doaj"
+   ],
+   "open_access": {
+    "is_oa": true,
+    "oa_status": "diamond",
+    "oa_url": "https://www.pediatr-neonatol.com/article/S1875-9572(26)00143-9/pdf",
+    "any_repository_has_fulltext": false
+   },
+   "institutions": [],
+   "countries_distinct_count": 2,
+   "institutions_distinct_count": 18,
+   "corresponding_author_ids": [
+    "https://openalex.org/A5013781948",
+    "https://openalex.org/A5018652304",
+    "https://openalex.org/A5020194366",
+    "https://openalex.org/A5026282888",
+    "https://openalex.org/A5028021306",
+    "https://openalex.org/A5034612623",
+    "https://openalex.org/A5062667605",
+    "https://openalex.org/A5062817352",
+    "https://openalex.org/A5082767904",
+    "https://openalex.org/A5101927273",
+    "https://openalex.org/A5101958214",
+    "https://openalex.org/A5111817656",
+    "https://openalex.org/A5146778462"
+   ],
+   "corresponding_institution_ids": [
+    "https://openalex.org/I148366613",
+    "https://openalex.org/I152743029",
+    "https://openalex.org/I162838928",
+    "https://openalex.org/I173093425",
+    "https://openalex.org/I22407884",
+    "https://openalex.org/I2802587341",
+    "https://openalex.org/I2803004286",
+    "https://openalex.org/I3020100970",
+    "https://openalex.org/I4210091198",
+    "https://openalex.org/I4210091773",
+    "https://openalex.org/I4210113809",
+    "https://openalex.org/I4210116208",
+    "https://openalex.org/I4210131804",
+    "https://openalex.org/I4210140944",
+    "https://openalex.org/I4210156562",
+    "https://openalex.org/I4210158999",
+    "https://openalex.org/I4210159511",
+    "https://openalex.org/I91807558"
+   ],
+   "apc_list": {
+    "value": 0,
+    "currency": "USD",
+    "value_usd": 0
+   },
+   "apc_paid": null,
+   "fwci": 0.0,
+   "has_fulltext": true,
+   "cited_by_count": 0,
+   "citation_normalized_percentile": {
+    "value": 0.81639929,
+    "is_in_top_1_percent": false,
+    "is_in_top_10_percent": false
+   },
+   "cited_by_percentile_year": null,
+   "biblio": {
+    "volume": null,
+    "issue": null,
+    "first_page": null,
+    "last_page": null
+   },
+   "is_retracted": false,
+   "is_paratext": false,
+   "is_xpac": false,
+   "primary_topic": {
+    "id": "https://openalex.org/T10218",
+    "display_name": "Sepsis Diagnosis and Treatment",
+    "score": 0.9994999766349792,
+    "subfield": {
+     "id": "https://openalex.org/subfields/2713",
+     "display_name": "Epidemiology"
+    },
+    "field": {
+     "id": "https://openalex.org/fields/27",
+     "display_name": "Medicine"
+    },
+    "domain": {
+     "id": "https://openalex.org/domains/4",
+     "display_name": "Health Sciences"
+    }
+   },
+   "locations_count": 1,
+   "locations": [
+    {
+     "id": "doi:10.1016/j.pedneo.2026.06.006",
+     "is_oa": true,
+     "landing_page_url": "https://doi.org/10.1016/j.pedneo.2026.06.006",
+     "pdf_url": "https://www.pediatr-neonatol.com/article/S1875-9572(26)00143-9/pdf",
+     "source": {
+      "id": "https://openalex.org/S183831342",
+      "display_name": "Pediatrics & Neonatology",
+      "issn_l": "1875-9572",
+      "issn": [
+       "1875-9572",
+       "2212-1692"
+      ],
+      "is_oa": true,
+      "is_in_doaj": true,
+      "is_core": true,
+      "listed_in": [
+       "cwts-core",
+       "doaj",
+       "doyens",
+       "jufo-1",
+       "medline"
+      ],
+      "host_organization": "https://openalex.org/P4310320990",
+      "host_organization_name": "Elsevier BV",
+      "host_organization_lineage": [
+       "https://openalex.org/P4310320990"
+      ],
+      "host_organization_lineage_names": [
+       "Elsevier BV"
+      ],
+      "type": "journal"
+     },
+     "license": "cc-by-nc-nd",
+     "license_id": "https://openalex.org/licenses/cc-by-nc-nd",
+     "version": "publishedVersion",
+     "is_accepted": true,
+     "is_published": true,
+     "raw_source_name": "Pediatrics &amp; Neonatology",
+     "raw_type": "journal-article"
+    }
+   ],
+   "best_oa_location": {
+    "id": "doi:10.1016/j.pedneo.2026.06.006",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.1016/j.pedneo.2026.06.006",
+    "pdf_url": "https://www.pediatr-neonatol.com/article/S1875-9572(26)00143-9/pdf",
+    "source": {
+     "id": "https://openalex.org/S183831342",
+     "display_name": "Pediatrics & Neonatology",
+     "issn_l": "1875-9572",
+     "issn": [
+      "1875-9572",
+      "2212-1692"
+     ],
+     "is_oa": true,
+     "is_in_doaj": true,
+     "is_core": true,
+     "listed_in": [
+      "cwts-core",
+      "doaj",
+      "doyens",
+      "jufo-1",
+      "medline"
+     ],
+     "host_organization": "https://openalex.org/P4310320990",
+     "host_organization_name": "Elsevier BV",
+     "host_organization_lineage": [
+      "https://openalex.org/P4310320990"
+     ],
+     "host_organization_lineage_names": [
+      "Elsevier BV"
+     ],
+     "type": "journal"
+    },
+    "license": "cc-by-nc-nd",
+    "license_id": "https://openalex.org/licenses/cc-by-nc-nd",
+    "version": "publishedVersion",
+    "is_accepted": true,
+    "is_published": true,
+    "raw_source_name": "Pediatrics &amp; Neonatology",
+    "raw_type": "journal-article"
+   },
+   "sustainable_development_goals": [
+    {
+     "id": "https://metadata.un.org/sdg/3",
+     "score": 0.98580002784729,
+     "display_name": "Good health and well-being"
+    }
+   ],
+   "sustainable_development_goals_aurora": [],
+   "study_designs": [],
+   "awards": [],
+   "funders": [
+    {
+     "id": "https://openalex.org/F4320306493",
+     "display_name": "Abbott Laboratories",
+     "ror": "https://ror.org/0052svj16"
+    }
+   ],
+   "has_content": {
+    "pdf": true,
+    "grobid_xml": true
+   },
+   "content_urls": {
+    "pdf": "https://content.openalex.org/works/W7213638009.pdf",
+    "grobid_xml": "https://content.openalex.org/works/W7213638009.grobid-xml"
+   },
+   "referenced_works_count": 50,
+   "updated_date": "2026-09-29T14:09:16.559479",
+   "created_date": "2026-09-20T00:00:00"
+  },
+  {
+   "id": "https://openalex.org/W7213985103",
+   "doi": "https://doi.org/10.1016/j.jphys.2026.08.013",
+   "title": "Appraisal of Clinical Practice Guideline: physical therapy management of children with Developmental coordination disorder",
+   "display_name": "Appraisal of Clinical Practice Guideline: physical therapy management of children with Developmental coordination disorder",
+   "publication_year": 2026,
+   "publication_date": "2026-09-01",
+   "ids": {
+    "openalex": "https://openalex.org/W7213985103",
+    "doi": "https://doi.org/10.1016/j.jphys.2026.08.013"
+   },
+   "language": "en",
+   "primary_location": {
+    "id": "doi:10.1016/j.jphys.2026.08.013",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.1016/j.jphys.2026.08.013",
+    "pdf_url": "https://www.sciencedirect.com/science/article/pii/S1836955326000998/pdf",
+    "source": {
+     "id": "https://openalex.org/S99546260",
+     "display_name": "Journal of physiotherapy",
+     "issn_l": "1836-9553",
+     "issn": [
+      "1836-9553",
+      "1836-9561"
+     ],
+     "is_oa": true,
+     "is_in_doaj": true,
+     "is_core": true,
+     "listed_in": [
+      "cwts-core",
+      "doaj",
+      "doyens",
+      "jufo-2",
+      "ki-jl-3",
+      "medline",
+      "norway-2"
+     ],
+     "host_organization": "https://openalex.org/P4310320990",
+     "host_organization_name": "Elsevier BV",
+     "host_organization_lineage": [
+      "https://openalex.org/P4310320990"
+     ],
+     "host_organization_lineage_names": [
+      "Elsevier BV"
+     ],
+     "type": "journal"
+    },
+    "license": "cc-by-nc-nd",
+    "license_id": "https://openalex.org/licenses/cc-by-nc-nd",
+    "version": "publishedVersion",
+    "is_accepted": true,
+    "is_published": true,
+    "raw_source_name": "Journal of Physiotherapy",
+    "raw_type": "journal-article"
+   },
+   "type": "article",
+   "indexed_in": [
+    "crossref",
+    "doaj"
+   ],
+   "open_access": {
+    "is_oa": true,
+    "oa_status": "gold",
+    "oa_url": "https://www.sciencedirect.com/science/article/pii/S1836955326000998/pdf",
+    "any_repository_has_fulltext": false
+   },
+   "institutions": [],
+   "countries_distinct_count": 1,
+   "institutions_distinct_count": 1,
+   "corresponding_author_ids": [
+    "https://openalex.org/A5047952985"
+   ],
+   "corresponding_institution_ids": [
+    "https://openalex.org/I165779595"
+   ],
+   "apc_list": {
+    "value": 3450,
+    "currency": "USD",
+    "value_usd": 3450
+   },
+   "apc_paid": {
+    "value": 3450,
+    "currency": "USD",
+    "value_usd": 3450
+   },
+   "fwci": 0.0,
+   "has_fulltext": true,
+   "cited_by_count": 0,
+   "citation_normalized_percentile": {
+    "value": 0.81227973,
+    "is_in_top_1_percent": false,
+    "is_in_top_10_percent": false
+   },
+   "cited_by_percentile_year": null,
+   "biblio": {
+    "volume": null,
+    "issue": null,
+    "first_page": null,
+    "last_page": null
+   },
+   "is_retracted": false,
+   "is_paratext": false,
+   "is_xpac": false,
+   "primary_topic": {
+    "id": "https://openalex.org/T12241",
+    "display_name": "Children's Physical and Motor Development",
+    "score": 0.98580002784729,
+    "subfield": {
+     "id": "https://openalex.org/subfields/3204",
+     "display_name": "Developmental and Educational Psychology"
+    },
+    "field": {
+     "id": "https://openalex.org/fields/32",
+     "display_name": "Psychology"
+    },
+    "domain": {
+     "id": "https://openalex.org/domains/2",
+     "display_name": "Social Sciences"
+    }
+   },
+   "locations_count": 1,
+   "locations": [
+    {
+     "id": "doi:10.1016/j.jphys.2026.08.013",
+     "is_oa": true,
+     "landing_page_url": "https://doi.org/10.1016/j.jphys.2026.08.013",
+     "pdf_url": "https://www.sciencedirect.com/science/article/pii/S1836955326000998/pdf",
+     "source": {
+      "id": "https://openalex.org/S99546260",
+      "display_name": "Journal of physiotherapy",
+      "issn_l": "1836-9553",
+      "issn": [
+       "1836-9553",
+       "1836-9561"
+      ],
+      "is_oa": true,
+      "is_in_doaj": true,
+      "is_core": true,
+      "listed_in": [
+       "cwts-core",
+       "doaj",
+       "doyens",
+       "jufo-2",
+       "ki-jl-3",
+       "medline",
+       "norway-2"
+      ],
+      "host_organization": "https://openalex.org/P4310320990",
+      "host_organization_name": "Elsevier BV",
+      "host_organization_lineage": [
+       "https://openalex.org/P4310320990"
+      ],
+      "host_organization_lineage_names": [
+       "Elsevier BV"
+      ],
+      "type": "journal"
+     },
+     "license": "cc-by-nc-nd",
+     "license_id": "https://openalex.org/licenses/cc-by-nc-nd",
+     "version": "publishedVersion",
+     "is_accepted": true,
+     "is_published": true,
+     "raw_source_name": "Journal of Physiotherapy",
+     "raw_type": "journal-article"
+    }
+   ],
+   "best_oa_location": {
+    "id": "doi:10.1016/j.jphys.2026.08.013",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.1016/j.jphys.2026.08.013",
+    "pdf_url": "https://www.sciencedirect.com/science/article/pii/S1836955326000998/pdf",
+    "source": {
+     "id": "https://openalex.org/S99546260",
+     "display_name": "Journal of physiotherapy",
+     "issn_l": "1836-9553",
+     "issn": [
+      "1836-9553",
+      "1836-9561"
+     ],
+     "is_oa": true,
+     "is_in_doaj": true,
+     "is_core": true,
+     "listed_in": [
+      "cwts-core",
+      "doaj",
+      "doyens",
+      "jufo-2",
+      "ki-jl-3",
+      "medline",
+      "norway-2"
+     ],
+     "host_organization": "https://openalex.org/P4310320990",
+     "host_organization_name": "Elsevier BV",
+     "host_organization_lineage": [
+      "https://openalex.org/P4310320990"
+     ],
+     "host_organization_lineage_names": [
+      "Elsevier BV"
+     ],
+     "type": "journal"
+    },
+    "license": "cc-by-nc-nd",
+    "license_id": "https://openalex.org/licenses/cc-by-nc-nd",
+    "version": "publishedVersion",
+    "is_accepted": true,
+    "is_published": true,
+    "raw_source_name": "Journal of Physiotherapy",
+    "raw_type": "journal-article"
+   },
+   "sustainable_development_goals": [
+    {
+     "id": "https://metadata.un.org/sdg/3",
+     "score": 0.9391000270843506,
+     "display_name": "Good health and well-being"
+    }
+   ],
+   "sustainable_development_goals_aurora": [],
+   "study_designs": [],
+   "awards": [],
+   "funders": [],
+   "has_content": {
+    "pdf": true,
+    "grobid_xml": true
+   },
+   "content_urls": {
+    "pdf": "https://content.openalex.org/works/W7213985103.pdf",
+    "grobid_xml": "https://content.openalex.org/works/W7213985103.grobid-xml"
+   },
+   "referenced_works_count": 0,
+   "updated_date": "2026-09-25T08:18:29.962427",
+   "created_date": "2026-09-22T00:00:00"
+  },
+  {
+   "id": "https://openalex.org/W7216381068",
+   "doi": "https://doi.org/10.1016/j.dcn.2026.101830",
+   "title": "Frontal Lead in Preterm Functional Brain Maturation",
+   "display_name": "Frontal Lead in Preterm Functional Brain Maturation",
+   "publication_year": 2026,
+   "publication_date": "2026-10-01",
+   "ids": {
+    "openalex": "https://openalex.org/W7216381068",
+    "doi": "https://doi.org/10.1016/j.dcn.2026.101830"
+   },
+   "language": "en",
+   "primary_location": {
+    "id": "doi:10.1016/j.dcn.2026.101830",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.1016/j.dcn.2026.101830",
+    "pdf_url": "https://www.sciencedirect.com/science/article/pii/S1878929326001726/pdf",
+    "source": {
+     "id": "https://openalex.org/S176508836",
+     "display_name": "Developmental Cognitive Neuroscience",
+     "issn_l": "1878-9293",
+     "issn": [
+      "1878-9293",
+      "1878-9307"
+     ],
+     "is_oa": true,
+     "is_in_doaj": true,
+     "is_core": true,
+     "listed_in": [
+      "cwts-core",
+      "doaj",
+      "doyens",
+      "jufo-1",
+      "ki-jl-1",
+      "medline",
+      "norway-2"
+     ],
+     "host_organization": "https://openalex.org/P4310320990",
+     "host_organization_name": "Elsevier BV",
+     "host_organization_lineage": [
+      "https://openalex.org/P4310320990"
+     ],
+     "host_organization_lineage_names": [
+      "Elsevier BV"
+     ],
+     "type": "journal"
+    },
+    "license": "cc-by-nc-nd",
+    "license_id": "https://openalex.org/licenses/cc-by-nc-nd",
+    "version": "publishedVersion",
+    "is_accepted": true,
+    "is_published": true,
+    "raw_source_name": "Developmental Cognitive Neuroscience",
+    "raw_type": "journal-article"
+   },
+   "type": "article",
+   "indexed_in": [
+    "crossref",
+    "doaj"
+   ],
+   "open_access": {
+    "is_oa": true,
+    "oa_status": "gold",
+    "oa_url": "https://www.sciencedirect.com/science/article/pii/S1878929326001726/pdf",
+    "any_repository_has_fulltext": false
+   },
+   "institutions": [],
+   "countries_distinct_count": 1,
+   "institutions_distinct_count": 3,
+   "corresponding_author_ids": [
+    "https://openalex.org/A5153614016"
+   ],
+   "corresponding_institution_ids": [
+    "https://openalex.org/I132118926",
+    "https://openalex.org/I76134821"
+   ],
+   "apc_list": {
+    "value": 3650,
+    "currency": "USD",
+    "value_usd": 3650
+   },
+   "apc_paid": {
+    "value": 3650,
+    "currency": "USD",
+    "value_usd": 3650
+   },
+   "fwci": 0.0,
+   "has_fulltext": true,
+   "cited_by_count": 0,
+   "citation_normalized_percentile": {
+    "value": 0.85915493,
+    "is_in_top_1_percent": false,
+    "is_in_top_10_percent": false
+   },
+   "cited_by_percentile_year": null,
+   "biblio": {
+    "volume": null,
+    "issue": null,
+    "first_page": "101830",
+    "last_page": "101830"
+   },
+   "is_retracted": false,
+   "is_paratext": false,
+   "is_xpac": false,
+   "primary_topic": {
+    "id": "https://openalex.org/T11060",
+    "display_name": "Infant Development and Preterm Care",
+    "score": 0.7621999979019165,
+    "subfield": {
+     "id": "https://openalex.org/subfields/2735",
+     "display_name": "Pediatrics, Perinatology and Child Health"
+    },
+    "field": {
+     "id": "https://openalex.org/fields/27",
+     "display_name": "Medicine"
+    },
+    "domain": {
+     "id": "https://openalex.org/domains/4",
+     "display_name": "Health Sciences"
+    }
+   },
+   "locations_count": 1,
+   "locations": [
+    {
+     "id": "doi:10.1016/j.dcn.2026.101830",
+     "is_oa": true,
+     "landing_page_url": "https://doi.org/10.1016/j.dcn.2026.101830",
+     "pdf_url": "https://www.sciencedirect.com/science/article/pii/S1878929326001726/pdf",
+     "source": {
+      "id": "https://openalex.org/S176508836",
+      "display_name": "Developmental Cognitive Neuroscience",
+      "issn_l": "1878-9293",
+      "issn": [
+       "1878-9293",
+       "1878-9307"
+      ],
+      "is_oa": true,
+      "is_in_doaj": true,
+      "is_core": true,
+      "listed_in": [
+       "cwts-core",
+       "doaj",
+       "doyens",
+       "jufo-1",
+       "ki-jl-1",
+       "medline",
+       "norway-2"
+      ],
+      "host_organization": "https://openalex.org/P4310320990",
+      "host_organization_name": "Elsevier BV",
+      "host_organization_lineage": [
+       "https://openalex.org/P4310320990"
+      ],
+      "host_organization_lineage_names": [
+       "Elsevier BV"
+      ],
+      "type": "journal"
+     },
+     "license": "cc-by-nc-nd",
+     "license_id": "https://openalex.org/licenses/cc-by-nc-nd",
+     "version": "publishedVersion",
+     "is_accepted": true,
+     "is_published": true,
+     "raw_source_name": "Developmental Cognitive Neuroscience",
+     "raw_type": "journal-article"
+    }
+   ],
+   "best_oa_location": {
+    "id": "doi:10.1016/j.dcn.2026.101830",
+    "is_oa": true,
+    "landing_page_url": "https://doi.org/10.1016/j.dcn.2026.101830",
+    "pdf_url": "https://www.sciencedirect.com/science/article/pii/S1878929326001726/pdf",
+    "source": {
+     "id": "https://openalex.org/S176508836",
+     "display_name": "Developmental Cognitive Neuroscience",
+     "issn_l": "1878-9293",
+     "issn": [
+      "1878-9293",
+      "1878-9307"
+     ],
+     "is_oa": true,
+     "is_in_doaj": true,
+     "is_core": true,
+     "listed_in": [
+      "cwts-core",
+      "doaj",
+      "doyens",
+      "jufo-1",
+      "ki-jl-1",
+      "medline",
+      "norway-2"
+     ],
+     "host_organization": "https://openalex.org/P4310320990",
+     "host_organization_name": "Elsevier BV",
+     "host_organization_lineage": [
+      "https://openalex.org/P4310320990"
+     ],
+     "host_organization_lineage_names": [
+      "Elsevier BV"
+     ],
+     "type": "journal"
+    },
+    "license": "cc-by-nc-nd",
+    "license_id": "https://openalex.org/licenses/cc-by-nc-nd",
+    "version": "publishedVersion",
+    "is_accepted": true,
+    "is_published": true,
+    "raw_source_name": "Developmental Cognitive Neuroscience",
+    "raw_type": "journal-article"
+   },
+   "sustainable_development_goals": [
+    {
+     "id": "https://metadata.un.org/sdg/3",
+     "score": 0.46810001134872437,
+     "display_name": "Good health and well-being"
+    }
+   ],
+   "sustainable_development_goals_aurora": [],
+   "study_designs": [
+    {
+     "id": "https://openalex.org/study-designs/observational-study",
+     "display_name": "Observational Study"
+    }
+   ],
+   "awards": [],
+   "funders": [],
+   "has_content": {
+    "pdf": true,
+    "grobid_xml": true
+   },
+   "content_urls": {
+    "pdf": "https://content.openalex.org/works/W7216381068.pdf",
+    "grobid_xml": "https://content.openalex.org/works/W7216381068.grobid-xml"
+   },
+   "referenced_works_count": 32,
+   "updated_date": "2026-10-06T10:28:23.643775",
+   "created_date": "2026-10-03T00:00:00"
+  }
+ ],
+ "group_by": []
+}

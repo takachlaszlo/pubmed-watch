@@ -80,12 +80,14 @@ class ApiConfig:
     port: int  # 0 = disabled
     token: str  # empty = no authentication (LAN only)
     webhook_url: str  # n8n webhook called after each run; empty = off
-    pdf_dir: Path  # the folder the PDFs are saved to, as this container sees it (read-only is enough)
+    pdf_dir: Path  # the folder the PDFs are saved to, as this container sees it
+    public_url: str  # how n8n reaches this API (used in download links that go through the service)
 
     @classmethod
     def from_env(cls) -> "ApiConfig":
         return cls(port=int(_env("API_PORT", "8765") or 0), token=_env("API_TOKEN"),
-                   webhook_url=_env("N8N_WEBHOOK_URL"), pdf_dir=Path(_env("PDF_DIR", "/pdfs")))
+                   webhook_url=_env("N8N_WEBHOOK_URL"), pdf_dir=Path(_env("PDF_DIR", "/pdfs")),
+                   public_url=_env("API_PUBLIC_URL", "http://192.168.1.168:8765").rstrip("/"))
 
 
 @dataclass
@@ -95,6 +97,12 @@ class SourceConfig:
     unpaywall_email: str  # empty = Unpaywall lookup off
     user_agent: str
     timeout: float
+    # optional keys: each source is simply skipped while its key is empty
+    openalex_api_key: str = ""
+    elsevier_api_key: str = ""
+    elsevier_insttoken: str = ""
+    wiley_tdm_token: str = ""
+    core_api_key: str = ""
 
     @classmethod
     def from_env(cls) -> "SourceConfig":
@@ -102,9 +110,25 @@ class SourceConfig:
             ncbi_api_key=_env("NCBI_API_KEY"),
             ncbi_email=_env("NCBI_EMAIL"),
             unpaywall_email=_env("UNPAYWALL_EMAIL"),
+            openalex_api_key=_env("OPENALEX_API_KEY"),
+            elsevier_api_key=_env("ELSEVIER_API_KEY"),
+            elsevier_insttoken=_env("ELSEVIER_INSTTOKEN"),
+            wiley_tdm_token=_env("WILEY_TDM_TOKEN"),
+            core_api_key=_env("CORE_API_KEY"),
             user_agent=_env("USER_AGENT", "pubmed-watch/1.0 (+https://github.com/takachlaszlo/pubmed-watch)"),
             timeout=float(_env("HTTP_TIMEOUT", "60")),
         )
+
+
+@dataclass
+class ReportConfig:
+    library_link: str  # e.g. "https://proxy.example.org/login?url=https://doi.org/{doi}"; empty = no library link
+    request_signature: str  # closing lines of the "ask the author" e-mail; empty = none
+
+    @classmethod
+    def from_env(cls) -> "ReportConfig":
+        return cls(library_link=_env("LIBRARY_LINK_TEMPLATE"),
+                   request_signature=_env("REQUEST_SIGNATURE").replace("\\n", "\n"))
 
 
 @dataclass
@@ -139,6 +163,9 @@ class DownloadsConfig:
     retry_for_days: int  # ... until this many days after the first attempt
     folders: list[str]  # PDF folder levels, outermost first: section | journal | issue | year
     inbox: str  # flat folder n8n saves into; the service files the PDFs from here
+    sections: list[str]  # report sections whose PDFs are downloaded; empty = all
+    kinds: list[str]  # article kinds to download (guideline, systematic_review, ...); empty = all
+    preprints: bool  # also download the preprint of an article that has no downloadable published version
 
 
 @dataclass
@@ -157,6 +184,7 @@ class Config:
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig.from_env)
     api: ApiConfig = field(default_factory=ApiConfig.from_env)
     sources: SourceConfig = field(default_factory=SourceConfig.from_env)
+    report: ReportConfig = field(default_factory=ReportConfig.from_env)
 
     def topic(self, topic_id: str) -> Topic | None:
         return next((t for t in self.topics if t.id == topic_id), None)
@@ -215,7 +243,13 @@ def load_config(path: str | os.PathLike | None = None) -> Config:
         retry_for_days=int(dl.get("retry_for_days", 365)),
         folders=[str(f) for f in dl.get("folders", ["journal", "issue"])],
         inbox=str(dl.get("inbox", DEFAULT_INBOX)),
+        sections=[str(x) for x in dl.get("sections", [])],
+        kinds=[str(x) for x in dl.get("kinds", [])],
+        preprints=bool(dl.get("preprints", True)),
     )
+    for section_id in downloads.sections:
+        if section_id not in section_ids:
+            raise ValueError(f"ismeretlen szekció a downloads.sections-ben: {section_id}")
     for folder in downloads.folders:
         if folder not in FOLDER_KINDS:
             raise ValueError(f"ismeretlen mappa-típus a downloads.folders-ben: {folder} (lehet: {', '.join(FOLDER_KINDS)})")

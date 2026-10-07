@@ -47,8 +47,8 @@ def test_unpaywall_parse_basic():
     links, candidates = parse_unpaywall({"is_oa": True, "best_oa_location": {"url_for_pdf": "https://x.org/a.pdf",
                                                                           "url_for_landing_page": "https://x.org/a"},
                                          "oa_locations": []})
-    assert (links.oa, links.url_pdf, links.url_fulltext, candidates) == (True, "https://x.org/a.pdf", "https://x.org/a",
-                                                                          ["https://x.org/a.pdf"])
+    assert (links.oa, links.url_pdf, links.url_fulltext) == (True, "https://x.org/a.pdf", "https://x.org/a")
+    assert [c["url"] for c in candidates] == ["https://x.org/a.pdf"]
     links, candidates = parse_unpaywall({"is_oa": False, "best_oa_location": None})
     assert (links.oa, links.url_pdf, candidates) == (False, "", [])
 

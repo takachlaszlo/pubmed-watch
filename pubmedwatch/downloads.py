@@ -22,7 +22,8 @@ log = logging.getLogger(__name__)
 FOLDER_KINDS = ("section", "journal", "issue", "year")
 DEFAULT_INBOX = "_inbox"
 _BAD_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
-_PMID_IN_NAME = re.compile(r"^[0-9x]{4}-(\d+)-.*\.pdf$", re.I)
+_PMID_IN_NAME = re.compile(r"^[0-9x]{4}-(\d+)-.*?(-PREPRINT)?\.[pP][dD][fF]$")  # the suffix is upper case only
+PREPRINT_SUFFIX = "-PREPRINT"  # a preprint is never filed as if it were the peer-reviewed article
 
 
 def safe_name(text: str, fallback: str = "ismeretlen", maxlen: int = 60) -> str:
@@ -65,12 +66,13 @@ def issue_folder(article: dict) -> str:
     return "_".join(parts)
 
 
-def pdf_filename(article: dict) -> str:
+def pdf_filename(article: dict, version: str = "vor") -> str:
     year = (article.get("pub_year") or "")[:4] or "xxxx"
-    return f"{year}-{article['pmid']}-{slug(article.get('title', ''))}.pdf"
+    suffix = PREPRINT_SUFFIX if version == "preprint" else ""
+    return f"{year}-{article['pmid']}-{slug(article.get('title', ''))}{suffix}.pdf"
 
 
-def pdf_relpath(article: dict, folders: list[str]) -> str:
+def pdf_relpath(article: dict, folders: list[str], version: str = "vor") -> str:
     """Path of the PDF relative to the PDF root, with forward slashes."""
     parts: list[str] = []
     for kind in folders:
@@ -84,16 +86,16 @@ def pdf_relpath(article: dict, folders: list[str]) -> str:
             parts.append((article.get("pub_year") or "")[:4] or "xxxx")
         else:
             raise ValueError(f"ismeretlen mappa-típus: {kind}")
-    parts.append(pdf_filename(article))
+    parts.append(pdf_filename(article, version))
     return "/".join(parts)
 
 
-def scan_pdf_dir(root: Path | str) -> list[tuple[str, str, int, str]]:
-    """(pmid, relative path, size, modified ISO time) of every PDF named by our scheme, at any depth.
+def scan_pdf_dir(root: Path | str) -> list[tuple[str, str, str, int, str]]:
+    """(pmid, version, relative path, size, modified ISO time) of every PDF named by our scheme, at any depth.
 
     Names only: the files are never opened. A PDF that was moved elsewhere in the tree still counts."""
     root = Path(root)
-    found: list[tuple[str, str, int, str]] = []
+    found: list[tuple[str, str, str, int, str]] = []
     if not root.is_dir():
         return found
     for folder, _dirs, files in os.walk(root):
@@ -107,12 +109,13 @@ def scan_pdf_dir(root: Path | str) -> list[tuple[str, str, int, str]]:
             except OSError:
                 continue
             modified = datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds")
-            found.append((match.group(1), full.relative_to(root).as_posix(), stat.st_size, modified))
+            version = "preprint" if match.group(2) else "vor"
+            found.append((match.group(1), version, full.relative_to(root).as_posix(), stat.st_size, modified))
     return found
 
 
-def inbox_relpath(article: dict, inbox: str = DEFAULT_INBOX) -> str:
-    return f"{inbox}/{pdf_filename(article)}"
+def inbox_relpath(article: dict, inbox: str = DEFAULT_INBOX, version: str = "vor") -> str:
+    return f"{inbox}/{pdf_filename(article, version)}"
 
 
 def safe_relpath(rel: str) -> bool:
@@ -174,13 +177,13 @@ def organize_all(storage, root: Path | str, folders: list[str], inbox: str = DEF
     if not root.is_dir():
         return 0
     moved = 0
-    for pmid, current, article in storage.downloads_to_organize(only_pmid):
-        target = pdf_relpath(article, folders)
+    for pmid, version, current, article in storage.downloads_to_organize(only_pmid):
+        target = pdf_relpath(article, folders, version)
         if current == target:
             continue
         final = organize_file(root, current, target, keep_dirs=(inbox,))
         if final:
-            storage.set_download_path(pmid, final)
+            storage.set_download_path(pmid, final, version)
             moved += 1
     if moved:
         storage.commit()

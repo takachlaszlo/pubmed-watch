@@ -18,7 +18,8 @@ def fx(name):
 
 def test_parse_real_answers():
     links, cands = parse_unpaywall(fx("pdf_ok"))
-    assert links.oa and cands and "springer" in cands[0] and links.url_pdf == cands[0] and links.url_fulltext
+    assert links.oa and cands and "springer" in cands[0]["url"] and links.url_pdf == cands[0]["url"] and links.url_fulltext
+    assert links.oa_status and links.version  # provenance travels with the answer
 
     links, cands = parse_unpaywall(fx("landing_only"))  # open access, but only an HTML page: no PDF address
     assert links.oa and not cands and links.url_pdf == "" and links.url_fulltext.startswith("http")
@@ -28,7 +29,7 @@ def test_parse_real_answers():
 
     # a copy that lives only on Europe PMC / PMC is not an extra source: those pages are browser-gated
     _, cands = parse_unpaywall(fx("epmc_location"))
-    assert all("ncbi.nlm.nih.gov" not in c and "europepmc.org" not in c for c in cands)
+    assert all("ncbi.nlm.nih.gov" not in c["url"] and "europepmc.org" not in c["url"] for c in cands)
 
 
 def test_classification_by_one_probe():
@@ -39,7 +40,7 @@ def test_classification_by_one_probe():
     assert (found["1"].pdf_source, bool(found["1"].url_pdf)) == ("unpaywall", True)
     assert found["2"].pdf_source == "unpaywall-web" and found["2"].url_pdf  # kept as a link for people
     assert found["3"].pdf_source == "" and found["3"].url_pdf == "" and found["3"].url_fulltext  # open page only
-    assert "4" not in found
+    assert found["4"].oa_status == "closed" and not found["4"].url_pdf  # kept only as provenance
     assert len(http.probes) == 2  # one polite request per candidate, never repeated against a refusal
 
 

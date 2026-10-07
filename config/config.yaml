@@ -159,6 +159,13 @@ downloads:
   # Az n8n nem tud mappát létrehozni, ezért ebbe az egy, mindig létező mappába ment; innen a figyelő
   # teszi át a PDF-et a végleges mappába (és javítja, ha a PubMed később kiadja az issue-t).
   inbox: _inbox
+  # Mely szekciók PDF-jeit töltse le az n8n (üres lista = mindet). Ezt mostantól itt kell állítani, nem az n8n-ben.
+  sections: [iranyelvek, gyermek-ams, gyermekinfektologia, review-gyermek, review-infektologia]
+  # Szűkítés cikktípusra (guideline, systematic_review, rct, protocol, review, other); üres = bármi
+  kinds: []
+  # Ha a megjelent változat nem tölthető le, a preprintje igen (medRxiv/bioRxiv), azt is töltse le
+  # (a fájlnév "-PREPRINT" végű, és a levélben is "nem lektorált" jelölést kap).
+  preprints: true
 
 clinicaltrials:
   enabled: true

@@ -83,7 +83,7 @@ def test_webhook_payload(cfg, mails, monkeypatch):
     assert url == cfg.api.webhook_url
     assert payload["event"] == "pubmed-watch.run" and payload["counts"]["articles"] == 1
     article = payload["articles"][0]
-    assert article["pmid"] == "42825830" and set(article["links"]) == {"pubmed", "doi", "fulltext", "pdf"}
+    assert article["pmid"] == "42825830" and set(article["links"]) == {"pubmed", "doi", "fulltext", "pdf", "preprint_pdf"}
 
 
 def test_mail_failure_keeps_data(cfg, monkeypatch):
@@ -130,9 +130,9 @@ def test_refresh_links_upgrades_europepmc_link_later(cfg, mails):
     storage = Storage(cfg.data_dir)
     assert storage.article("42814651")["pdf_source"] == "pmc-s3"
     storage.close()
-    # once on the best source it is not looked up again
+    # once on the best source the daily link search does not look at it again
     http = FakeHttp(cfg, s3_pmcids=("PMC13626073",))
-    assert runner.refresh_links(cfg, http=http, today=DAY1, force=True) == 0 and not http.calls
+    assert runner.refresh_links(cfg, http=http, today=DAY1) == 0 and not http.calls  # the daily run leaves it alone
 
 
 def test_send_digest_from_database(cfg, mails):

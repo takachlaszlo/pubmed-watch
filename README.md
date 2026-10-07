@@ -71,26 +71,41 @@ Egy cikk rekordja (rövidítve):
 
 `kind`: `guideline` | `systematic_review` | `protocol` | `rct` | `review` | `other`.
 
-**PDF-linkek és források.** Minden cikknél a legjobb elérhető szabad PDF-link tárolódik, ebben a sorrendben:
-1. `pmc-s3`: a PMC Article Datasets nyilvános AWS-tárolója (`pmc-oa-opendata`). Közvetlen PDF, programból is
-   megbízhatóan letölthető, és gépi hozzáférésre készült. Csak az újrafelhasználást engedő licencű cikkek vannak benne.
-2. `unpaywall`: kiadói vagy repozitóriumi szabad PDF, amelyet a figyelő a felfedezéskor egyszer kipróbált, és
-   valóban PDF-et adott (pl. Springer, Nature, Cambridge, bioRxiv, medRxiv). Programból is letölthető.
-3. `europepmc`: a Europe PMC webes PDF-je. Böngészőből kattintva működik (ez van a levélben is, ha más nincs),
-   de programnak nem szabad letölteni, mert Cloudflare böngészőellenőrzés áll előtte, amit nem kerülünk meg.
-4. `unpaywall-web`: szabad PDF, de a kiadó oldala elutasítja a programot (pl. Wiley, ScienceDirect, OUP,
-   Taylor & Francis). Böngészőből kattintva működik, ezért a levélben megjelenik, az n8n azonban nem próbálkozik vele.
+**PDF-linkek és források.** Csak hivatalos, gépi hozzáférésre szánt csatornák. Minden cikknél a legjobb
+elérhető szabad PDF tárolódik, ebben a sorrendben (az első hat programból is letölthető):
 
-Az Unpaywall használatához egy kapcsolattartó e-mail-cím kell (`UNPAYWALL_EMAIL` a NAS-oldali compose-ban; az
-Unpaywall szabálya szerint minden lekérdezéssel el kell küldeni). A cím nem kerül a repóba. Ha az Unpaywall
-szerint a cikk nyílt hozzáférésű, de csak a kiadó HTML-oldala van meg, az a „Teljes szöveg” link lesz.
+| Forrás (`pdf_source`) | Mi ez | Kulcs |
+|---|---|---|
+| `pmc-s3` | a PMC Article Datasets nyilvános AWS-tárolója (`pmc-oa-opendata`), az újrafelhasználást engedő licencű cikkek | nem kell |
+| `unpaywall` | kiadói vagy repozitóriumi szabad PDF, amely egyszeri, udvarias próbára valóban PDF-et adott | `UNPAYWALL_EMAIL` |
+| `elsevier` | az Elsevier szövegbányászati (TDM) API-ja, a kulcs jogosultsága szerint (nyílt hozzáférésű cikkek) | `ELSEVIER_API_KEY` |
+| `wiley` | a Wiley TDM API-ja (PDF DOI alapján; 60 kérés / 10 perc korlát) | `WILEY_TDM_TOKEN` |
+| `core` | a CORE repozitórium-gyűjtő (gyakran szerzői kéziratok) | `CORE_API_KEY` |
+| `openalex` | az OpenAlex saját PDF-tárolója (kb. 60 millió nyílt hozzáférésű mű); a napi ingyenes keretből fizet, ezért utolsó | `OPENALEX_API_KEY` |
+| `europepmc`, `unpaywall-web` | szabad PDF, de böngészőellenőrzés mögött: csak a levélben, kattintható linkként | – |
 
-Az `/articles` rekord `pdf_source` mezője megmondja, melyik forrásról van szó, szűrni is lehet rá
-(`?pdf_source=pmc-s3`). A PMC-másolat gyakran csak napokkal a megjelenés után kerül a tárolóba, ezért a napi
-futás újra ellenőrzi azokat, amelyeknek még nincs `pmc-s3` vagy `unpaywall` linkjük: az első 7 napban naponta,
-30 napig hetente, utána havonta, egy évig (hogy az Unpaywallt se terheljük fölöslegesen, és a fél-egy év után
-megnyíló cikkek is előkerüljenek). Ha jobb forrást talál, az `updated_at` mező frissül, így az n8n az `/articles?updated_since=...` lekérdezéssel megkapja az utólag letölthetővé
-váltakat. Fizetős cikkekhez csak PubMed/DOI link van.
+A kulcsot igénylő forrásokat (Elsevier, Wiley, OpenAlex) az n8n nem közvetlenül tölti le, hanem a figyelőn keresztül
+(`GET /downloads/file/<pmid>`), így a kulcs a NAS-on marad, nem kerül az n8n-be, a naplóba vagy a levélbe. Kulcs nélkül
+az adott forrás egyszerűen kimarad. Hol kérhető ingyenes kulcs: OpenAlex: openalex.org fiók (API key); Elsevier:
+dev.elsevier.com; Wiley: egyéni Wiley Online Library fiókkal a „Text and Data Mining” oldalon („Get a TDM token”);
+CORE: core.ac.uk/services/api.
+
+**Eredet (provenance).** Minden cikknél tárolódik az OA-státusz (`oa_status`: gold, green, hybrid, bronze, diamond,
+closed), és a tárolt PDF licence (`pdf_license`) és verziója (`pdf_version`: publishedVersion, acceptedVersion,
+submittedVersion). Az elfogadott kézirat a levélben jelölést kap.
+
+**Preprintek.** Ha egy cikk megjelent változata programból nem tölthető le, de van preprintje (az Europe PMC kapcsolja
+össze őket), a figyelő megkeresi a preprint PDF-jét (Europe PMC, a medRxiv/bioRxiv hivatalos API-ja, Unpaywall).
+A preprint külön tétel: a fájlneve `-PREPRINT` végű, a levélben „Preprint ↓ (nem lektorált)” linket kap, és sosem
+számít a megjelent cikknek: ha később a megjelent változat is szabaddá válik, azt is letölti.
+
+**Zárt cikkek.** A levélben a „Szerző megkérése” link előre kitöltött e-mailt nyit a PubMedben feltüntetett levelező
+szerzőnek (aláírás: `REQUEST_SIGNATURE`), és ha megadod a könyvtárad linkjét (`LIBRARY_LINK_TEMPLATE`, pl.
+`https://proxy.example.org/login?url=https://doi.org/{doi}`), egy „Könyvtár” link is megjelenik.
+
+A szabad példányt a figyelő a cikk korától függően újrakeresi: az első 7 napban naponta, 30 napig hetente, utána
+havonta, egy évig. Ha jobb forrást talál, az `updated_at` frissül, és a következő letöltési futás felveszi.
+Fizetős cikkekhez csak PubMed/DOI link van.
 
 ### PDF-letöltés (n8n) és nyilvántartás
 
@@ -98,7 +113,10 @@ A „mi töltődött le, mi nem” a figyelő adatbázisában van (`downloads` t
 túléli a workflow újraimportálását és a kézi próbafutásokat is. Az n8n a figyelőtől kérdezi meg, mit töltsön le,
 és ide jelent vissza. Szabályok:
 
-- **Csak az elmúlt 24 óra.** A `GET /downloads/due` csak azokat a program által letölthető (`pmc-s3`/`unpaywall`)
+- **Mit tölt le.** A `config.yaml` `downloads.sections` listájában szereplő szekciók (alapból az irányelvek, a
+  gyermek-AMS, a gyermekinfektológia és a két review-szekció), opcionálisan cikktípusra szűkítve (`kinds`). Ezt
+  a figyelőben kell állítani, az n8n-hez nem kell nyúlni hozzá.
+- **Csak az elmúlt 24 óra.** A `GET /downloads/due` csak azokat a program által letölthető
   cikkeket ajánlja fel, amelyek az elmúlt 24 órában jelentek meg vagy kaptak PDF-linket (`downloads.window_hours`).
 - **Ami megvan, azt nem tölti le újra.** Három védelem van: (1) a 24 órás ablak, (2) a nyilvántartás: a sikeres
   letöltés végleges, és a későn érkező hibajelentés sem írhatja felül, (3) lemezellenőrzés: ami a PDF-mappában már
@@ -134,7 +152,8 @@ POST érkezik `{event, run_id, window, counts, articles[], trials[]}` tartalomma
 1. `\\Becalel\docker\pubmed-watch\` mappa, benne a [`compose.yaml`](compose.yaml) és egy üres `data` mappa.
 2. Container Manager → Projekt → Létrehozás → név: `pubmed-watch`, útvonal: `/volume1/docker/pubmed-watch`.
 3. A compose-ban írd be az `SMTP_PASSWORD` értékét. Opcionálisan: `API_TOKEN`, `N8N_WEBHOOK_URL`,
-   `NCBI_API_KEY`, `UNPAYWALL_EMAIL`. Egyszeri műveletek: `DIGEST_ON_START_DAYS` (összesítő levél),
+   `NCBI_API_KEY`, `UNPAYWALL_EMAIL`, `OPENALEX_API_KEY`, `ELSEVIER_API_KEY` (+ `ELSEVIER_INSTTOKEN`),
+   `WILEY_TDM_TOKEN`, `CORE_API_KEY`, `LIBRARY_LINK_TEMPLATE`, `REQUEST_SIGNATURE`, `API_PUBLIC_URL`. Egyszeri műveletek: `DIGEST_ON_START_DAYS` (összesítő levél),
    `LINK_REFRESH_ON_START` (új érték = egyszeri teljes PDF-link frissítés, pl. új forrás bevezetése után).
 4. Indítás. Az első próbához átmenetileg `RUN_ON_START: "true"`.
 

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -12,7 +12,8 @@ from .clinicaltrials import new_trials
 from .config import Config
 from .downloads import organize_all
 from .http import HttpClient
-from .openaccess import europepmc_links, pmc_s3_links, unpaywall_links
+from .openaccess import (AUTO_DOWNLOAD_SOURCES, core_links, elsevier_links, europepmc_links, openalex_links,
+                         pmc_s3_links, preprint_links, unpaywall_links, unpaywall_provenance, wiley_links)
 from .pubmed import PubMed
 from .report import Digest, build
 from .storage import Storage
@@ -37,7 +38,10 @@ def make_http(cfg: Config) -> HttpClient:
     ncbi_delay = 0.12 if cfg.sources.ncbi_api_key else 0.4  # NCBI: 10 req/s with a key, 3 without
     return HttpClient(cfg.sources.user_agent, cfg.sources.timeout,
                       {"eutils.ncbi.nlm.nih.gov": ncbi_delay, "www.ebi.ac.uk": 0.3, "api.unpaywall.org": 0.2,
-                       "clinicaltrials.gov": 0.5, "pmc-oa-opendata.s3.amazonaws.com": 0.1})
+                       "clinicaltrials.gov": 0.5, "pmc-oa-opendata.s3.amazonaws.com": 0.1,
+                       "api.openalex.org": 0.2, "content.openalex.org": 0.5, "api.elsevier.com": 0.3,
+                       "api.wiley.com": 10.5,  # Wiley TDM allows 60 requests per 10 minutes
+                       "api.core.ac.uk": 2.0, "www.medrxiv.org": 1.0, "www.biorxiv.org": 1.0, "api.biorxiv.org": 1.0})
 
 
 def search_window(storage: Storage, cfg: Config, today: date) -> tuple[date, date, bool]:
@@ -50,30 +54,78 @@ def search_window(storage: Storage, cfg: Config, today: date) -> tuple[date, dat
 
 
 def enrich_links(storage: Storage, http: HttpClient, cfg: Config, today: date, force: bool = False) -> int:
-    """Open-access full text / PDF links for recent articles whose PDF can still improve.
+    """Open-access full text / PDF links, with their provenance, for recent articles whose PDF can still improve.
 
-    Order of preference: PMC Article Datasets (S3, scriptable) > Unpaywall (optional) > Europe PMC web link."""
-    pending = storage.pending_oa((today - timedelta(days=cfg.oa_recheck_days)).isoformat(), today.isoformat(), force)
-    if not pending:
+    Each step only looks at the articles still without a PDF a script may fetch: Europe PMC (links, licence,
+    preprint), PMC S3, Unpaywall, the Elsevier and Wiley TDM APIs, CORE, the OpenAlex PDF cache (it spends the
+    OpenAlex budget, so it comes last); finally the preprint of whatever is still missing. Sources without a key
+    are skipped."""
+    since = (today - timedelta(days=cfg.oa_recheck_days)).isoformat()
+    pending = storage.pending_oa(since, today.isoformat(), force)
+    # once (forced refresh): PDFs found before licence / OA status were recorded get their provenance filled in
+    backfill = storage.missing_provenance(since) if force else []
+    if not pending and not backfill:
         return 0
+    src = cfg.sources
+    dois = {p: doi for p, doi, _, _ in pending if doi}
+    open_ = {p for p, *_ in pending}  # still without a PDF a script may fetch
+    gained: Counter = Counter()
     changed = 0
-    found = europepmc_links(http, [p for p, _, _, _ in pending])
-    for pmid, links in found.items():
-        changed += storage.update_oa(pmid, links)
-    pmcids = {pmid: (found[pmid].pmcid if pmid in found and found[pmid].pmcid else pmcid)
-              for pmid, _, pmcid, _ in pending}
-    s3 = pmc_s3_links(http, {pmid: pmcid for pmid, pmcid in pmcids.items() if pmcid})
-    for pmid, links in s3.items():
-        changed += storage.update_oa(pmid, links)
-    if cfg.sources.unpaywall_email:
-        missing = {p: doi for p, doi, _, _ in pending if doi and p not in s3}
-        known_pdf = {p: url for p, _, _, url in pending if url}
-        for pmid, links in unpaywall_links(http, missing, cfg.sources.unpaywall_email, known_pdf).items():
+
+    def apply(found: dict, label: str) -> None:
+        nonlocal changed
+        for pmid, links in found.items():
             changed += storage.update_oa(pmid, links)
-    storage.mark_oa_checked(p for p, _, _, _ in pending)
+            if links.pdf_source in AUTO_DOWNLOAD_SOURCES and pmid in open_:
+                open_.discard(pmid)
+                gained[label] += 1
+
+    def still_open_dois() -> dict[str, str]:
+        return {p: dois[p] for p in sorted(open_) if p in dois}
+
+    epmc = europepmc_links(http, [p for p, *_ in pending] + [p for p, *_ in backfill])
+    apply({p: links for p, links in epmc.items() if p in open_}, "europepmc")
+    s3_rows = {p: c for p, _, c, _, source in backfill if source == "pmc-s3" and c}
+    if s3_rows:  # same S3 address again, now with the licence Europe PMC states for that copy
+        apply(pmc_s3_links(http, s3_rows, {p: links.license for p, links in epmc.items()}), "pmc-s3")
+    pmcids = {p: (epmc[p].pmcid if p in epmc and epmc[p].pmcid else pmcid) for p, _, pmcid, _ in pending}
+    apply(pmc_s3_links(http, {p: c for p, c in pmcids.items() if c and p in open_},
+                       {p: links.license for p, links in epmc.items()}), "pmc-s3")
+    if src.unpaywall_email:
+        apply(unpaywall_links(http, still_open_dois(), src.unpaywall_email,
+                              {p: url for p, _, _, url in pending if url}), "unpaywall")
+    if src.elsevier_api_key:
+        todo = still_open_dois()
+        apply(elsevier_links(http, todo, src.elsevier_api_key, src.elsevier_insttoken, storage.pdf_links(todo)), "elsevier")
+    if src.wiley_tdm_token:
+        todo = still_open_dois()
+        apply(wiley_links(http, todo, src.wiley_tdm_token, storage.pdf_links(todo)), "wiley")
+    if src.core_api_key:
+        apply(core_links(http, still_open_dois(), src.core_api_key), "core")
+    if src.openalex_api_key:  # looked up for every pending article: OA status and licence are worth having
+        found = openalex_links(http, {p: d for p, d in dois.items()}, src.openalex_api_key)
+        for pmid, links in found.items():
+            if pmid not in open_:  # a better PDF exists already: keep only the provenance
+                links.url_pdf, links.pdf_source = "", ""
+        apply(found, "openalex")
+    if src.unpaywall_email:  # OA status for whatever still lacks it, without trying any download
+        todo = storage.without_oa_status([p for p, *_ in pending] + [p for p, *_ in backfill])
+        lookup = {**dois, **{p: d for p, d, *_ in backfill if d}}
+        stored = storage.pdf_links(todo)
+        for pmid, links in unpaywall_provenance(http, {p: lookup[p] for p in todo if p in lookup},
+                                                src.unpaywall_email, stored).items():
+            changed += storage.update_oa(pmid, links)
+    if cfg.downloads.preprints:
+        for pmid, links in preprint_links(http, storage.preprint_ids(sorted(open_)), src.unpaywall_email).items():
+            if storage.update_preprint(pmid, links):
+                changed += 1
+                gained["preprint"] += links.source == "preprint"
+    storage.mark_oa_checked(p for p, *_ in pending)
     storage.commit()
-    log.info("OA-linkek: %d cikk ellenőrizve, ebből PMC S3: %d%s, frissült: %d", len(pending), len(s3),
-             ", Unpaywall is" if cfg.sources.unpaywall_email else "", changed)
+    if backfill:
+        log.info("eredetadatok (licenc, OA-státusz) pótolva: %d cikknél", len(backfill))
+    log.info("OA-linkek: %d cikk ellenőrizve, programból letölthetővé vált: %s, frissült: %d", len(pending),
+             ", ".join(f"{k} {v}" for k, v in gained.items() if v) or "0", changed)
     return changed
 
 

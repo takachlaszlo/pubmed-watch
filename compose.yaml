@@ -55,6 +55,18 @@ services:
       # Unpaywall: további szabad PDF-linkek és kiadói teljes szövegek; egy kapcsolattartó e-mail-cím
       # kell hozzá (az Unpaywall szabálya), üresen hagyva kikapcsolva. Ide a saját címedet írd, ne a repóba.
       UNPAYWALL_EMAIL: ""
+      # további szabad PDF-források; mindegyik ingyenes kulccsal működik, üresen hagyva kimarad
+      OPENALEX_API_KEY: ""
+      ELSEVIER_API_KEY: ""
+      ELSEVIER_INSTTOKEN: ""
+      WILEY_TDM_TOKEN: ""
+      CORE_API_KEY: ""
+      # ahogy az n8n eléri ezt az API-t (a kulcsos forrásokat ezen keresztül tölti le)
+      API_PUBLIC_URL: "http://192.168.1.168:8765"
+      # zárt cikkekhez a levélben: könyvtári link ({doi}, {pmid}, {title}) és a "Szerző megkérése" levél aláírása
+      # (sortörés: \n)
+      LIBRARY_LINK_TEMPLATE: ""
+      REQUEST_SIGNATURE: ""
 
     extra_hosts:
       - "mail.home.arpa:192.168.1.168"

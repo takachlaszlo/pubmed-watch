@@ -50,7 +50,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// === SZELEKCIÓS SZABÁLYOK – itt módosíthatók ===\n// Melyik levélszekciók PDF-jét töltsük le automatikusan?\n//   iranyelvek | gyermek-ams | gyermekinfektologia | review-gyermek | review-infektologia | innovacio | vizsgalatok\nconst SECTIONS = ['iranyelvek', 'gyermek-ams', 'gyermekinfektologia'];\n// Opcionális további feltétel a cikktípusra (pl. ['guideline','systematic_review']); üres = bármi.\nconst KINDS = [];\n// Csak olyan forrásból töltünk le, amelyet program is elérhet. A Europe PMC webes PDF-je és a legtöbb kiadói\n// oldal böngészőellenőrzés mögött van, azok a levélben kattintható linkek maradnak.\nconst SOURCES = ['pmc-s3', 'unpaywall'];\n// A PDF-mappa az n8n konténerében (a compose-ban: ./shared:/files). A figyelő ugyanezt a mappát látja.\nconst ROOT = '/files/pubmed-pdf/';\n// ==============================================\n// Az n8n nem tud mappát létrehozni, ezért minden PDF az _inbox mappába kerül; a figyelő a jelentés után\n// a végleges folyóirat/issue mappába teszi át. A \"download\" mezőt a figyelő számolja (új cikk az elmúlt\n// 24 órából, vagy a havi újrapróbálás esedékes), a már letöltöttet sosem ajánlja fel újra.\n\nconst out = [];\n$input.all().forEach((item, i) => {\n  const a = item.json;\n  if (!a || !a.pmid || !a.links || !a.links.pdf || !a.download) return;\n  if (!SECTIONS.includes(a.section)) return;\n  if (KINDS.length && !KINDS.includes(a.kind)) return;\n  if (!SOURCES.includes(a.pdf_source)) return;\n  out.push({\n    json: { pmid: a.pmid, section: a.section, title: a.title, reason: a.download.reason, pdfUrl: a.links.pdf,\n            relpath: a.download.path, path: ROOT + a.download.path },\n    pairedItem: { item: i },\n  });\n});\nreturn out;"
+        "jsCode": "// A letöltendők listáját és minden szabályt a PubMed-figyelő adja (config.yaml: downloads.sections, kinds,\n// preprints): hogy mely szekciók, hogy csak programból letölthető forrás, hogy csak az elmúlt 24 óra, és hogy a\n// már letöltöttet soha többé. Ez a node csak átadja a tételeket; szűrést itt csak kivételesen érdemes tenni.\n// A PDF-mappa az n8n konténerében (a compose-ban: ./shared:/files). A figyelő ugyanezt a mappát látja.\nconst ROOT = '/files/pubmed-pdf/';\n\nconst out = [];\n$input.all().forEach((item, i) => {\n  const a = item.json;\n  if (!a || !a.pmid || !a.download || !a.download.url || !a.download.path) return;\n  out.push({\n    json: { pmid: a.pmid, version: a.download.version || 'vor', reason: a.download.reason, title: a.title,\n            url: a.download.url, relpath: a.download.path, path: ROOT + a.download.path },\n    pairedItem: { item: i },\n  });\n});\nreturn out;"
       },
       "id": "a2000000-0000-4000-8000-000000000003",
       "name": "Szelekció",
@@ -63,7 +63,7 @@
     },
     {
       "parameters": {
-        "url": "={{ $json.pdfUrl }}",
+        "url": "={{ $json.url }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -165,6 +165,10 @@
               "value": "={{ $('Szelekció').item.json.pmid }}"
             },
             {
+              "name": "version",
+              "value": "={{ $('Szelekció').item.json.version }}"
+            },
+            {
               "name": "status",
               "value": "ok"
             },
@@ -203,6 +207,10 @@
             {
               "name": "pmid",
               "value": "={{ $('Szelekció').item.json.pmid }}"
+            },
+            {
+              "name": "version",
+              "value": "={{ $('Szelekció').item.json.version }}"
             },
             {
               "name": "status",
@@ -247,6 +255,10 @@
             {
               "name": "pmid",
               "value": "={{ $('Szelekció').item.json.pmid }}"
+            },
+            {
+              "name": "version",
+              "value": "={{ $('Szelekció').item.json.version }}"
             },
             {
               "name": "status",

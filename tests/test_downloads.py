@@ -70,7 +70,7 @@ def test_scan_finds_our_files_at_any_depth(tmp_path):
         f = tmp_path / rel
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_bytes(b"%PDF-1.4 test")
-    found = {pmid: (rel, size) for pmid, rel, size, _ in scan_pdf_dir(tmp_path)}
+    found = {pmid: (rel, size) for pmid, _version, rel, size, _ in scan_pdf_dir(tmp_path)}
     assert set(found) == {"111", "222", "333"}
     assert found["111"] == ("Lancet/2026_vol-1_issue-02/2026-111-a.pdf", 13)
     assert scan_pdf_dir(tmp_path / "missing") == []
@@ -95,7 +95,7 @@ def put(storage, pmid, *, source="pmc-s3", updated=NOW - timedelta(hours=3), **k
 
 
 def due(storage, now=NOW, hours=24):
-    return {a["pmid"]: a["download"] for a in storage.downloads_due(now, hours, 365, lambda a: {"path": f"J/{a['pmid']}.pdf"})}
+    return {a["pmid"]: a["download"] for a in storage.downloads_due(now, hours, 365, lambda a, v: {"path": f"J/{a['pmid']}.pdf"})}
 
 
 def test_only_fresh_scriptable_articles_are_offered(store):
@@ -106,7 +106,7 @@ def test_only_fresh_scriptable_articles_are_offered(store):
     put(store, "5", source="unpaywall")
     put(store, "6", source="")                                   # no PDF link at all
     assert set(due(store)) == {"1", "5"}
-    assert due(store)["1"] == {"reason": "new", "attempts": 0, "last_error": "", "path": "J/1.pdf"}
+    assert due(store)["1"] == {"version": "vor", "reason": "new", "attempts": 0, "last_error": "", "path": "J/1.pdf"}
     assert set(due(store, hours=48)) == {"1", "2", "5"}          # the window is a parameter, not a habit
 
 
@@ -156,7 +156,7 @@ def test_a_new_link_after_a_failure_is_tried_sooner(store):
 def test_pdfs_already_on_disk_are_marked_done(store):
     put(store, "1")
     put(store, "2")
-    found = [("1", "iranyelvek/2026-1-title.pdf", 5000, stamp(NOW - timedelta(days=1)))]
+    found = [("1", "vor", "iranyelvek/2026-1-title.pdf", 5000, stamp(NOW - timedelta(days=1)))]
     assert store.reconcile_downloads(found, NOW) == 1
     assert store.reconcile_downloads(found, NOW) == 0            # idempotent
     assert set(due(store)) == {"2"}
@@ -164,7 +164,7 @@ def test_pdfs_already_on_disk_are_marked_done(store):
     assert ledger["1"]["source"] == "disk" and ledger["1"]["bytes"] == 5000 and ledger["1"]["status"] == "ok"
     # a failed row is healed too when the file turns out to exist
     store.report_download("2", "failed", NOW, 30, error="x")
-    assert store.reconcile_downloads([("2", "a/2026-2-t.pdf", 1, stamp(NOW))], NOW) == 1
+    assert store.reconcile_downloads([("2", "vor", "a/2026-2-t.pdf", 1, stamp(NOW))], NOW) == 1
     assert store.downloads(status="failed") == []
     assert store.counts()["downloads_ok"] == 2
 
@@ -175,8 +175,9 @@ def served(cfg, store, tmp_path):
     cfg.api.pdf_dir = tmp_path / "pdfs"
     (cfg.api.pdf_dir / "Old" / "2025_online-first").mkdir(parents=True)
     (cfg.api.pdf_dir / "Old" / "2025_online-first" / "2026-2-already-here.pdf").write_bytes(b"%PDF-1.7")
-    put(store, "1", volume="45", issue="10")
-    put(store, "2")
+    recent = datetime.now().astimezone() - timedelta(hours=1)  # the API measures the 24-hour window from now
+    put(store, "1", volume="45", issue="10", updated=recent)
+    put(store, "2", updated=recent)
     return store
 
 
@@ -191,6 +192,7 @@ def test_due_endpoint_gives_target_paths_and_skips_files_on_disk(cfg, served):
     assert items[0]["download"]["path"] == "_inbox/2026-1-title-1.pdf"            # where n8n saves it
     assert items[0]["download"]["final_path"] == "Pediatr Infect Dis J/2026_vol-45_issue-10/2026-1-title-1.pdf"
     assert items[0]["links"]["pdf"] == "https://x.org/1.pdf"
+    assert items[0]["download"]["url"] == "https://x.org/1.pdf" and items[0]["download"]["version"] == "vor"
 
 
 def test_report_endpoint_validates_and_records(cfg, served):
