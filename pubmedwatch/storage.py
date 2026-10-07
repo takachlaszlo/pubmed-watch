@@ -298,6 +298,16 @@ class Storage:
                         (*new, now_iso(), pmid))
         return True
 
+    def pmc_links(self) -> list[sqlite3.Row]:
+        """(pmid, pmcid, url_pdf, pdf_license) of the articles whose PDF comes from the PMC bucket."""
+        return self.db.execute("SELECT pmid, pmcid, url_pdf, pdf_license FROM articles "
+                               "WHERE pdf_source='pmc-s3' AND url_pdf<>''").fetchall()
+
+    def set_pdf_link(self, pmid: str, url: str, source: str, version: str = "") -> None:
+        """Replaces the PDF link outright (a repair, unlike `update_oa`, which only ever upgrades)."""
+        self.db.execute("UPDATE articles SET url_pdf=?, pdf_source=?, pdf_version=?, updated_at=? WHERE pmid=?",
+                        (url, source, version, now_iso(), pmid))
+
     def missing_provenance(self, since_iso: str) -> list[tuple[str, str, str, str, str]]:
         """(pmid, doi, pmcid, url_pdf, pdf_source) of articles with a downloadable PDF but no licence or OA status yet
         (found before provenance was recorded)."""
@@ -473,6 +483,12 @@ class Storage:
         self._ledger_write(values)
         self.db.commit()
         return dict(self._ledger_row(pmid, version))
+
+    def offer_again(self, pmid: str, version: str, now: datetime, reason: str) -> None:
+        """Turns a download back into a failure that is due at once (e.g. the wrong file had been saved)."""
+        self.db.execute("UPDATE downloads SET status='failed', next_retry_at=?, last_error=?, path='', bytes=NULL, "
+                        "saved_at='' WHERE pmid=? AND version=?",
+                        (now.isoformat(timespec="seconds"), reason[:300], pmid, version))
 
     def retry_transient_failures(self, now: datetime) -> int:
         """Offers the downloads the network cut off (still within their quick retries) again right away: called at

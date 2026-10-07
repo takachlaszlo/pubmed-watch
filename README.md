@@ -76,7 +76,7 @@ elérhető szabad PDF tárolódik, ebben a sorrendben (az első hat programból 
 
 | Forrás (`pdf_source`) | Mi ez | Kulcs |
 |---|---|---|
-| `pmc-s3` | a PMC Article Datasets nyilvános AWS-tárolója (`pmc-oa-opendata`), az újrafelhasználást engedő licencű cikkek | nem kell |
+| `pmc-s3` | a PMC Article Datasets nyilvános AWS-tárolója (`pmc-oa-opendata`), az újrafelhasználást engedő licencű cikkek; mindig a cikk saját PDF-je (`PMC….N.pdf`), sosem a melléklet | nem kell |
 | `unpaywall` | kiadói vagy repozitóriumi szabad PDF, amely egyszeri, udvarias próbára valóban PDF-et adott | `UNPAYWALL_EMAIL` |
 | `elsevier` | az Elsevier szövegbányászati (TDM) API-ja, a kulcs jogosultsága szerint (nyílt hozzáférésű cikkek) | `ELSEVIER_API_KEY` |
 | `wiley` | a Wiley TDM API-ja (PDF DOI alapján; 60 kérés / 10 perc korlát) | `WILEY_TDM_TOKEN` |

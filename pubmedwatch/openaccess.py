@@ -183,11 +183,18 @@ def preprint_links(http: HttpClient, pmid_to_ppr: dict[str, str], unpaywall_emai
 
 
 # --- PMC Article Datasets (S3) -----------------------------------------------------------------------
+PMC_MAIN_PDF = re.compile(r"(PMC\d+)\.(\d+)/\1\.\2\.pdf$")
+
+
 def parse_pmc_listing(xml: str) -> str:
-    """URL of the PDF in an S3 ListObjectsV2 answer (first version that has one), or ''."""
-    keys = re.findall(r"<Key>([^<]+)</Key>", xml)
-    pdfs = sorted(k for k in keys if k.lower().endswith(".pdf"))
-    return f"{PMC_BUCKET}/{pdfs[0]}" if pdfs else ""
+    """URL of the article PDF in an S3 ListObjectsV2 answer, or ''. The article is <PMCID>.<v>/<PMCID>.<v>.pdf
+    (the latest version that has one); any other PDF in the folder (Data_Sheet_1.PDF, ...-s001.pdf) is a supplement."""
+    best: tuple[int, str] | None = None
+    for key in re.findall(r"<Key>([^<]+)</Key>", xml):
+        m = PMC_MAIN_PDF.fullmatch(key)
+        if m and (best is None or int(m.group(2)) > best[0]):
+            best = (int(m.group(2)), key)
+    return f"{PMC_BUCKET}/{best[1]}" if best else ""
 
 
 def pmc_s3_links(http: HttpClient, pmcids: dict[str, str], licenses: dict[str, str] | None = None) -> dict[str, OaLinks]:
@@ -196,7 +203,7 @@ def pmc_s3_links(http: HttpClient, pmcids: dict[str, str], licenses: dict[str, s
     found: dict[str, OaLinks] = {}
     for pmid, pmcid in pmcids.items():
         try:
-            xml = http.get_text(PMC_BUCKET + "/", {"list-type": "2", "prefix": pmcid + ".", "max-keys": "50"})
+            xml = http.get_text(PMC_BUCKET + "/", {"list-type": "2", "prefix": pmcid + ".", "max-keys": "1000"})
         except Exception as exc:
             log.debug("PMC S3: nincs adat (%s): %s", pmcid, redact(exc))
             continue

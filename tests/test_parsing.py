@@ -87,3 +87,13 @@ def test_pmc_s3_listing():
     xml = fixture_bytes("pmc_s3_listing.xml").decode("utf-8")
     assert parse_pmc_listing(xml) == "https://pmc-oa-opendata.s3.amazonaws.com/PMC13625194.1/PMC13625194.1.pdf"
     assert parse_pmc_listing("<ListBucketResult><KeyCount>0</KeyCount></ListBucketResult>") == ""
+
+
+def test_pmc_listing_never_takes_a_supplement_for_the_article():
+    keys = ["PMC13630949.1/Data_Sheet_1.PDF", "PMC13630949.1/PMC13630949.1.json", "PMC13630949.1/PMC13630949.1.pdf",
+            "PMC13630949.1/fpsyg-17-1893800-g001.webp", "PMC13630949.2/CESM-4-e70108-s001.pdf",
+            "PMC13630949.2/PMC13630949.2.pdf", "PMC13630949.2/PMC13630949.2.xml"]
+    xml = "<ListBucketResult>" + "".join(f"<Contents><Key>{k}</Key></Contents>" for k in keys) + "</ListBucketResult>"
+    assert parse_pmc_listing(xml) == "https://pmc-oa-opendata.s3.amazonaws.com/PMC13630949.2/PMC13630949.2.pdf"
+    only_supplements = "<ListBucketResult><Contents><Key>PMC1.1/DataSheet1.pdf</Key></Contents></ListBucketResult>"
+    assert parse_pmc_listing(only_supplements) == ""

@@ -457,3 +457,36 @@ def test_retries_are_capped_per_run_but_new_articles_never(store):
     assert [p for p, r in reasons if r == "new"] == ["6", "7", "8"]
     assert [p for p, r in reasons if r == "retry"] == ["5", "4"]  # the longest-waiting first
     assert len(store.downloads_due(later, 24, 365, lambda a, v: {"path": "x"})) == 8  # no cap: everything
+
+
+# --- one-off repair: PMC links that pointed at a supplement --------------------------------------------------------
+def test_supplements_taken_for_the_article_are_set_aside_and_the_article_comes_again(cfg, store, tmp_path):
+    cfg.api.pdf_dir = tmp_path / "pdfs"
+    bucket = "https://pmc-oa-opendata.s3.amazonaws.com"
+    put(store, "1", source="", pmcid="PMC101")
+    put(store, "2", source="", pmcid="PMC202")
+    put(store, "3", source="", pmcid="PMC303")
+    for pmid, pmcid, name in (("1", "PMC101", "Data_Sheet_1.PDF"), ("2", "PMC202", "DataSheet1.pdf"),
+                              ("3", "PMC303", "PMC303.1.pdf")):
+        store.update_oa(pmid, OaLinks(oa=True, pmcid=pmcid, url_pdf=f"{bucket}/{pmcid}.1/{name}", pdf_source="pmc-s3"))
+    saved = "Pediatr Infect Dis J/2026_online-first/2026-1-title-1.pdf"
+    (cfg.api.pdf_dir / saved).parent.mkdir(parents=True)
+    (cfg.api.pdf_dir / saved).write_bytes(b"%PDF-1.7 a data sheet")
+    store.report_download("1", "ok", NOW, 30, path=saved, size=21)
+    store.commit()
+
+    http = FakeHttp(cfg, s3_pmcids=("PMC101",))                  # PMC has the article PDF of 1, none of 2
+    later = NOW + timedelta(hours=2)
+    assert runner.repair_pmc_supplements(cfg, http=http, now=later) == 2  # 3 was right all along
+    a1, a2, a3 = (store.article(p) for p in ("1", "2", "3"))
+    assert a1["links"]["pdf"] == f"{bucket}/PMC101.1/PMC101.1.pdf" and a1["pdf_source"] == "pmc-s3"
+    assert a2["links"]["pdf"] == "" and a2["pdf_source"] == ""
+    assert a3["links"]["pdf"] == f"{bucket}/PMC303.1/PMC303.1.pdf"
+    # the data sheet is kept, but out of the way and under a name that is not counted as the article
+    assert not (cfg.api.pdf_dir / saved).exists()
+    assert (cfg.api.pdf_dir / "_mellekletek" / "1_Data_Sheet_1.PDF").read_bytes() == b"%PDF-1.7 a data sheet"
+    assert (cfg.api.pdf_dir / "_mellekletek" / "OLVASS_EL.txt").exists()
+    assert scan_pdf_dir(cfg.api.pdf_dir) == []
+    store.reconcile_downloads(scan_pdf_dir(cfg.api.pdf_dir), later)
+    assert due(store, later + timedelta(minutes=1))["1"]["reason"] == "retry"  # the article PDF is fetched again
+    assert runner.repair_pmc_supplements(cfg, http=http, now=later) == 0       # nothing left to repair

@@ -4,16 +4,17 @@ from __future__ import annotations
 import logging
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from . import mailer
 from .classify import classify, section_of
 from .clinicaltrials import new_trials
 from .config import Config
-from .downloads import organize_all
+from .downloads import organize_all, organize_file
 from .http import HttpClient
-from .openaccess import (AUTO_DOWNLOAD_SOURCES, core_links, elsevier_links, europepmc_links, openalex_links,
-                         pmc_s3_links, preprint_links, unpaywall_links, unpaywall_provenance, wiley_links)
+from .openaccess import (AUTO_DOWNLOAD_SOURCES, PMC_MAIN_PDF, core_links, elsevier_links, europepmc_links,
+                         openalex_links, pmc_s3_links, preprint_links, unpaywall_links, unpaywall_provenance, wiley_links)
 from .pubmed import PubMed
 from .report import Digest, build
 from .storage import Storage
@@ -158,6 +159,54 @@ def refresh_links(cfg: Config, http: HttpClient | None = None, today: date | Non
     storage = Storage(cfg.data_dir)
     try:
         return enrich_links(storage, http or make_http(cfg), cfg, today or date.today(), force=force)
+    finally:
+        storage.close()
+
+
+SUPPLEMENT_DIR = "_mellekletek"
+SUPPLEMENT_NOTE = """Ezek cikkekhez tartozó mellékletek (adatlapok, függelékek). Egy hiba miatt a rendszer a cikk helyett
+ezeket töltötte le a PMC-ből (2026. október). A cikkek saját PDF-jét a következő letöltés pótolja.
+A fájlnév eleje a cikk PMID-je. A mappa nyugodtan törölhető.
+"""
+
+
+def repair_pmc_supplements(cfg: Config, http: HttpClient | None = None, now: datetime | None = None) -> int:
+    """One-off: before the fix, a PMC link could point at a supplementary PDF of the article (the first PDF of the
+    folder in alphabetical order, e.g. Data_Sheet_1.PDF) instead of the article itself. Those links get the article
+    PDF (or none, if PMC has no PDF of the article); a supplement already downloaded under the article's name is
+    moved to `_mellekletek/` and the article is offered for download again. Returns how many articles were fixed."""
+    now = now or datetime.now().astimezone()
+    storage = Storage(cfg.data_dir)
+    try:
+        wrong = [r for r in storage.pmc_links() if not PMC_MAIN_PDF.search(r["url_pdf"])]
+        if not wrong:
+            return 0
+        pmcids = {r["pmid"]: r["pmcid"] or r["url_pdf"].rsplit("/", 2)[-2].split(".")[0] for r in wrong}
+        fixed = pmc_s3_links(http or make_http(cfg), pmcids, {r["pmid"]: r["pdf_license"] for r in wrong})
+        root = Path(cfg.api.pdf_dir) if cfg.api.pdf_dir else None
+        ledger = {d["pmid"]: d for d in storage.downloads(status="ok", limit=100000) if d["version"] == "vor"}
+        moved = 0
+        for r in wrong:
+            pmid = r["pmid"]
+            links = fixed.get(pmid)
+            storage.set_pdf_link(pmid, links.url_pdf if links else "", "pmc-s3" if links else "",
+                                 "publishedVersion" if links else "")
+            done = ledger.get(pmid)
+            if done is None:
+                continue
+            if root is not None and done["path"]:
+                name = f"{pmid}_{r['url_pdf'].rsplit('/', 1)[-1]}"  # never matches the YYYY-<pmid>-... pattern
+                if organize_file(root, done["path"], f"{SUPPLEMENT_DIR}/{name}", keep_dirs=(cfg.downloads.inbox,)):
+                    moved += 1
+            storage.offer_again(pmid, "vor", now, "melléklet töltődött le a cikk helyett")
+        storage.commit()
+        if moved and root is not None:
+            note = root / SUPPLEMENT_DIR / "OLVASS_EL.txt"
+            if not note.exists():
+                note.write_text(SUPPLEMENT_NOTE, encoding="utf-8")
+        log.info("PMC-linkek javítva: %d cikk (a cikk helyett melléklet), ebből %d letöltött fájl áthelyezve a(z) "
+                 "%s mappába", len(wrong), moved, SUPPLEMENT_DIR)
+        return len(wrong)
     finally:
         storage.close()
 

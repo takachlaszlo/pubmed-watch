@@ -9,7 +9,7 @@ from .api import serve_in_background
 from .config import load_config
 from .downloads import organize_all, scan_pdf_dir
 from .storage import Storage as _Storage
-from .runner import refresh_bibliography_job, refresh_links, run_once, send_digest
+from .runner import refresh_bibliography_job, refresh_links, repair_pmc_supplements, run_once, send_digest
 from .storage import Storage
 
 log = logging.getLogger(__name__)
@@ -66,6 +66,10 @@ def _startup_tasks(config_path: str | None) -> None:
             job()
         except Exception:
             log.exception("a(z) %s frissítése indításkor sikertelen; a napi futás megismétli", label)
+    try:
+        _once(cfg, "pmc_supplement_repair", "2026-10-07", lambda: repair_pmc_supplements(cfg))
+    except Exception:
+        log.exception("a PMC-linkek javítása sikertelen")
     try:
         storage = _Storage(cfg.data_dir)
         try:
