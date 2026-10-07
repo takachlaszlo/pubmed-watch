@@ -125,7 +125,10 @@ túléli a workflow újraimportálását és a kézi próbafutásokat is. Az n8n
 - **Ami nem sikerült, azt havonta újrapróbálja, egy évig.** A hibás letöltést a figyelő 30 nap múlva ajánlja fel újra,
   az első próbálkozástól számított 365 napig (`retry_every_days`, `retry_for_days`). Ha közben a PDF-link megváltozott
   (új forrás), nem várja meg a hónapot. A mentési hibát (az n8n nem tudott írni a mappába) holnap újrapróbálja, mert az
-  a mi oldalunk hibája, nem a cikké.
+  a mi oldalunk hibája, nem a cikké. Ha csak a hálózat szakította meg a letöltést (megszakadt kapcsolat, időtúllépés,
+  túlterhelt szerver), a következő napi futás újra megpróbálja, legfeljebb háromszor (a figyelő újraindítása után
+  azonnal); a kiadói elutasítás (403, nem PDF) a havi újrapróbálásra vár. Egy futásban legfeljebb 100 korábbi hibát ajánl fel újra (`max_retries_per_run`), a
+  legrégebben várakozókat először, a többi másnap jön; a friss cikkekre nincs korlát.
 - **Mappák: folyóirat, azon belül issue.** `Pediatr Infect Dis J/2026_vol-45_issue-10/2026-<pmid>-<cím>.pdf`
   (`downloads.folders`: `section`, `journal`, `issue`, `year` kombinálható). Az issue-t a PubMed kötet/szám adata adja;
   az online először megjelent, még issue nélküli cikk az `2026_online-first` mappába kerül, és áthelyezésre kerül a
@@ -137,10 +140,13 @@ a végleges mappába (sosem ír felül fájlt, és a PDF-mappán kívülre nem n
 módon kell látnia ugyanazt a mappát (`/volume1/docker/n8n/shared/pubmed-pdf:/pdfs`, lásd a compose-ot).
 
 **Kész n8n-workflow: [`n8n/pubmed-pdf-letoltes.workflow.json`](n8n/pubmed-pdf-letoltes.workflow.json).**
-Naponta 07:00-kor (a figyelő 06:30-as futása után): `GET /downloads/due?hours=24`, a „Szelekció” Code node
-kiválasztja a letöltendőket (alapból az irányelvek, a gyermek-AMS és a gyermekinfektológia szekció; a szabályok a
-node tetején szerkeszthetők), letölti a PDF-eket (3 próbálkozással), az `_inbox` mappába menti, és minden eredményt
-jelent (`ok`, letöltési hiba, mentési hiba). Importálás: n8n → Workflows → Import from File, majd Publish. A régi
+Naponta 07:00-kor (a figyelő 06:30-as futása után): `GET /downloads/due?hours=24` (a letöltendők listáját és minden
+szabályt a figyelő adja), a „Szelekció” Code node átadja a tételeket, az „Egyenként” (Loop Over Items) node egyesével
+küldi őket tovább: letölti a PDF-et, ellenőrzi, hogy tényleg PDF, az `_inbox` mappába menti, és jelenti az eredményt
+(`ok`, letöltési hiba, mentési hiba), csak utána jön a következő. Az egyesével letöltés fontos: az n8n HTTP-node-ja
+a saját „batching” beállításával is egyszerre indítja a kéréseket, és a válaszokat addig olvasatlanul hagyja, amíg
+az utolsó is meg nem jön; hosszú listánál a szerverek ezeket a kapcsolatokat bontják („aborted”). Importálás:
+n8n → Workflows → Import from File (vagy Import from URL a GitHubon lévő nyers fájl címével), majd Publish. A régi
 változatot előbb vond vissza (Unpublish/Archive), különben mindkettő lefut. Az `_inbox` mappát (`shared/pubmed-pdf/_inbox`)
 előre létre kell hozni, és az n8n-nek írnia kell tudnia bele.
 

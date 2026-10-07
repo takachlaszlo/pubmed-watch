@@ -80,9 +80,10 @@ class HttpClient:
         finally:
             resp.close()
 
-    def stream(self, url: str, headers: dict | None = None, params: dict | None = None) -> requests.Response:
+    def stream(self, url: str, headers: dict | None = None, params: dict | None = None,
+               attempts: int | None = None) -> requests.Response:
         """GET whose body is read by the caller in chunks (the caller must close it)."""
-        return self.request("GET", url, headers=headers, params=params, stream=True)
+        return self.request("GET", url, headers=headers, params=params, stream=True, attempts=attempts)
 
     def get_json(self, url: str, params: dict | None = None, headers: dict | None = None,
                  attempts: int | None = None) -> dict:

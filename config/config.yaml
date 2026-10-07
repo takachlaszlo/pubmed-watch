@@ -150,9 +150,14 @@ sections:
 downloads:
   # Csak az elmúlt ennyi órában megjelent vagy PDF-linket kapott cikkeket ajánlja fel letöltésre.
   window_hours: 24
-  # Ami nem sikerült, azt ennyi naponta próbálja újra, az első próbálkozástól számított ennyi napig.
+  # Ami nem sikerült, azt ennyi naponta próbálja újra, az első próbálkozástól számított ennyi napig. Ha csak a hálózat
+  # szakította meg (megszakadt letöltés, időtúllépés, túlterhelt szerver), már a következő napi futás újra megpróbálja,
+  # legfeljebb háromszor; utána ez is havonta jön.
   retry_every_days: 30
   retry_for_days: 365
+  # Egy futásban legfeljebb ennyi korábban sikertelen letöltést ajánl fel újra, a legrégebben várakozókat először; a
+  # többi másnap jön. A friss cikkekre nincs korlát. 0 = nincs korlát.
+  max_retries_per_run: 100
   # Mappaszintek kívülről befelé: section | journal | issue | year
   # Pl. [journal, issue] -> Pediatr Infect Dis J/2026_vol-45_issue-10/2026-<pmid>-<cím>.pdf
   folders: [journal, issue]

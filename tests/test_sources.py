@@ -189,10 +189,11 @@ def test_key_protected_sources_go_through_the_service(cfg, store):
 
 class FakeStreamHttp:
     def __init__(self, body=b"%PDF-1.7 hello", error=None):
-        self.body, self.error, self.urls = body, error, []
+        self.body, self.error, self.urls, self.attempts = body, error, [], []
 
-    def stream(self, url, headers=None, params=None):
+    def stream(self, url, headers=None, params=None, attempts=None):
         self.urls.append(url)
+        self.attempts.append(attempts)
         if self.error:
             raise self.error
         body = self.body
@@ -227,6 +228,7 @@ def test_proxy_streams_the_pdf_and_never_leaks_the_key(cfg, store):
         with urllib.request.urlopen(base + "/downloads/file/5") as resp:
             assert resp.headers["Content-Type"] == "application/pdf" and resp.read() == b"%PDF-1.7 hello"
         assert ok.urls == ["https://content.openalex.org/works/W5.pdf?api_key=SECRETKEY"]
+        assert ok.attempts == [1]  # no retries while n8n waits: a failed try comes back at the next run
         with pytest.raises(urllib.error.HTTPError) as err:
             urllib.request.urlopen(base + "/downloads/file/6")      # direct source: nothing to proxy
         assert err.value.code == 400
@@ -312,7 +314,23 @@ def test_workflow_takes_url_path_and_version_from_the_service():
     assert nodes["PDF letöltése"]["parameters"]["url"] == "={{ $json.url }}"
     for name in ("Jelentés: kész", "Jelentés: letöltési hiba", "Jelentés: mentési hiba"):
         fields = {p["name"]: p["value"] for p in nodes[name]["parameters"]["bodyParameters"]["parameters"]}
-        assert fields["version"] == "={{ $('Szelekció').item.json.version }}"
+        assert fields["version"] == "={{ $('Egyenként').item.json.version }}"
+
+
+def test_workflow_downloads_one_pdf_at_a_time():
+    """The HTTP node's batching only staggers the starts and then leaves every response unread until the last one
+    is in; on a long list servers drop those connections ("aborted"). A loop of one item avoids that."""
+    from pathlib import Path
+    wf = json.loads((Path(__file__).parent.parent / "n8n" / "pubmed-pdf-letoltes.workflow.json").read_text(encoding="utf-8"))
+    nodes = {n["name"]: n for n in wf["nodes"]}
+    links = {src: [[t["node"] for t in branch] for branch in c["main"]] for src, c in wf["connections"].items()}
+    loop = nodes["Egyenként"]
+    assert loop["type"] == "n8n-nodes-base.splitInBatches" and loop["parameters"]["batchSize"] == 1
+    assert links["Szelekció"] == [["Egyenként"]] and links["Egyenként"] == [[], ["PDF letöltése"]]
+    for name in ("Jelentés: kész", "Jelentés: letöltési hiba", "Jelentés: mentési hiba"):
+        assert links[name] == [["Egyenként"]], name             # every path hands the turn to the next item
+    assert "batching" not in nodes["PDF letöltése"]["parameters"]["options"]
+    assert wf["settings"]["executionOrder"] == "v1"
     assert "api_key" not in json.dumps(wf).lower()  # no secret in the workflow
 
 

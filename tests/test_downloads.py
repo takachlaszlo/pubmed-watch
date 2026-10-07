@@ -123,10 +123,11 @@ def test_failed_downloads_come_back_monthly_for_a_year(store):
     put(store, "1")
     row = store.report_download("1", "failed", NOW, 30, error="HTTP 403")
     assert (row["attempts"], row["status"], row["last_error"]) == (1, "failed", "HTTP 403")
-    assert row["next_retry_at"] == stamp(NOW + timedelta(days=30))
+    assert row["next_retry_at"] == stamp(NOW + timedelta(days=30) - timedelta(hours=3))
     assert due(store, NOW + timedelta(days=1)) == {}             # not before the month is up
-    assert due(store, NOW + timedelta(days=29, hours=23)) == {}
-    retry = due(store, NOW + timedelta(days=30, minutes=1))["1"]
+    assert due(store, NOW + timedelta(days=29, hours=20)) == {}
+    # the daily run 30 days later starts a few seconds before the time this failure was reported: it still counts
+    retry = due(store, NOW + timedelta(days=30) - timedelta(seconds=20))["1"]
     assert (retry["reason"], retry["attempts"], retry["last_error"]) == ("retry", 1, "HTTP 403")
 
     # failing again pushes the next try another month out and counts the attempt
@@ -394,7 +395,65 @@ def test_a_save_problem_is_retried_tomorrow_not_next_month(cfg, served):
     row = json.loads(api.handle_post(cfg, served, "/downloads/report",
                                      {"pmid": "1", "status": "failed", "stage": "save", "error": "EACCES"})[2])
     retry = datetime.fromisoformat(row["next_retry_at"]) - datetime.fromisoformat(row["last_attempt_at"])
-    assert retry == timedelta(days=1)
+    assert retry == timedelta(days=1) - timedelta(hours=3)       # in time for tomorrow's run at the same hour
     row = json.loads(api.handle_post(cfg, served, "/downloads/report",
                                      {"pmid": "1", "status": "failed", "stage": "download", "error": "HTTP 403"})[2])
-    assert datetime.fromisoformat(row["next_retry_at"]) - datetime.fromisoformat(row["last_attempt_at"]) == timedelta(days=30)
+    gap = datetime.fromisoformat(row["next_retry_at"]) - datetime.fromisoformat(row["last_attempt_at"])
+    assert gap == timedelta(days=30) - timedelta(hours=3)
+
+
+# --- network failures: the next daily run tries again --------------------------------------------------------------
+def test_a_download_the_network_cut_off_is_retried_at_the_next_daily_run(store):
+    put(store, "1")
+    afternoon = NOW.replace(hour=15, minute=42)
+    row = store.report_download("1", "failed", afternoon, 30, error="aborted")
+    assert row["next_retry_at"] == stamp(afternoon + timedelta(hours=12))
+    tomorrow = NOW + timedelta(days=1)                           # the scheduled 07:00 run
+    assert due(store, tomorrow)["1"]["reason"] == "retry"
+    # three cut-off attempts in a row: from then on it waits for the monthly retry like any other failure
+    store.report_download("1", "failed", tomorrow, 30, error="timeout of 120000ms exceeded")
+    third = store.report_download("1", "failed", tomorrow + timedelta(days=1), 30, error="socket hang up")
+    assert third["next_retry_at"] == stamp(tomorrow + timedelta(days=1, hours=12))
+    fourth = store.report_download("1", "failed", tomorrow + timedelta(days=2), 30, error="aborted")
+    assert fourth["attempts"] == 4
+    assert fourth["next_retry_at"] == stamp(tomorrow + timedelta(days=32) - timedelta(hours=3))
+
+
+def test_a_refusal_is_not_mistaken_for_a_network_failure(store):
+    put(store, "1")
+    for error in ('403 - "<!DOCTYPE html><html lang=\\"en-US', "nem PDF (text/html)",
+                  '502 - {"error": "a forrás nem adta ki a PDF-et: HTTP 403 (api.wiley.com)"}'):
+        row = store.report_download("1", "failed", NOW, 30, error=error)
+        assert row["next_retry_at"] == stamp(NOW + timedelta(days=30) - timedelta(hours=3)), error
+    busy = '502 - {"error": "a forrás nem adta ki a PDF-et: HTTP 429 (content.openalex.org)"}'
+    store.db.execute("DELETE FROM downloads")
+    assert store.report_download("1", "failed", NOW, 30, error=busy)["next_retry_at"] == stamp(NOW + timedelta(hours=12))
+
+
+def test_after_a_restart_the_cut_off_downloads_are_offered_at_once(store):
+    for pmid in ("1", "2", "3"):
+        put(store, pmid)
+    for pmid, error in (("1", "aborted"), ("2", "HTTP 403"), ("3", "timeout of 120000ms exceeded")):
+        store._ledger_write({"pmid": pmid, "version": "vor", "status": "failed", "attempts": 1,
+                             "first_attempt_at": stamp(NOW), "last_attempt_at": stamp(NOW),
+                             "next_retry_at": stamp(NOW + timedelta(days=30)), "last_error": error, "path": "",
+                             "bytes": None, "saved_at": "", "source": "n8n"})
+    store.commit()
+    restart = NOW + timedelta(hours=9)
+    assert store.retry_transient_failures(restart) == 2
+    assert store.retry_transient_failures(restart) == 0          # idempotent
+    assert set(due(store, restart)) == {"1", "3"}                # the 403 still waits for its month
+
+
+def test_retries_are_capped_per_run_but_new_articles_never(store):
+    for n in range(1, 6):
+        put(store, str(n), updated=NOW - timedelta(days=3))
+        store.report_download(str(n), "failed", NOW - timedelta(days=3, minutes=n), 30, error="aborted")
+    for n in range(6, 9):
+        put(store, str(n))                                       # new within the 24-hour window
+    later = NOW + timedelta(minutes=1)
+    items = store.downloads_due(later, 24, 365, lambda a, v: {"path": f"J/{a['pmid']}.pdf"}, max_retries=2)
+    reasons = [(a["pmid"], a["download"]["reason"]) for a in items]
+    assert [p for p, r in reasons if r == "new"] == ["6", "7", "8"]
+    assert [p for p, r in reasons if r == "retry"] == ["5", "4"]  # the longest-waiting first
+    assert len(store.downloads_due(later, 24, 365, lambda a, v: {"path": "x"})) == 8  # no cap: everything

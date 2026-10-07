@@ -63,6 +63,20 @@
     },
     {
       "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "a2000000-0000-4000-8000-000000000010",
+      "name": "Egyenként",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
         "url": "={{ $json.url }}",
         "sendHeaders": true,
         "headerParameters": {
@@ -79,13 +93,7 @@
               "responseFormat": "file"
             }
           },
-          "timeout": 120000,
-          "batching": {
-            "batch": {
-              "batchSize": 1,
-              "batchInterval": 500
-            }
-          }
+          "timeout": 120000
         }
       },
       "id": "a2000000-0000-4000-8000-000000000004",
@@ -93,7 +101,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        660,
+        880,
         0
       ],
       "retryOnFail": true,
@@ -130,14 +138,14 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        880,
+        1100,
         -80
       ]
     },
     {
       "parameters": {
         "operation": "write",
-        "fileName": "={{ $('Szelekció').item.json.path }}",
+        "fileName": "={{ $('Egyenként').item.json.path }}",
         "dataPropertyName": "data",
         "options": {}
       },
@@ -146,7 +154,7 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
       "position": [
-        1100,
+        1320,
         -160
       ],
       "onError": "continueErrorOutput"
@@ -162,11 +170,11 @@
           "parameters": [
             {
               "name": "pmid",
-              "value": "={{ $('Szelekció').item.json.pmid }}"
+              "value": "={{ $('Egyenként').item.json.pmid }}"
             },
             {
               "name": "version",
-              "value": "={{ $('Szelekció').item.json.version }}"
+              "value": "={{ $('Egyenként').item.json.version }}"
             },
             {
               "name": "status",
@@ -174,7 +182,7 @@
             },
             {
               "name": "path",
-              "value": "={{ $('Szelekció').item.json.relpath }}"
+              "value": "={{ $('Egyenként').item.json.relpath }}"
             }
           ]
         },
@@ -187,7 +195,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1320,
+        1540,
         -220
       ],
       "retryOnFail": true,
@@ -206,11 +214,11 @@
           "parameters": [
             {
               "name": "pmid",
-              "value": "={{ $('Szelekció').item.json.pmid }}"
+              "value": "={{ $('Egyenként').item.json.pmid }}"
             },
             {
               "name": "version",
-              "value": "={{ $('Szelekció').item.json.version }}"
+              "value": "={{ $('Egyenként').item.json.version }}"
             },
             {
               "name": "status",
@@ -235,7 +243,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1100,
+        1320,
         140
       ],
       "retryOnFail": true,
@@ -254,11 +262,11 @@
           "parameters": [
             {
               "name": "pmid",
-              "value": "={{ $('Szelekció').item.json.pmid }}"
+              "value": "={{ $('Egyenként').item.json.pmid }}"
             },
             {
               "name": "version",
-              "value": "={{ $('Szelekció').item.json.version }}"
+              "value": "={{ $('Egyenként').item.json.version }}"
             },
             {
               "name": "status",
@@ -283,7 +291,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1320,
+        1540,
         -60
       ],
       "retryOnFail": true,
@@ -317,6 +325,18 @@
     },
     "Szelekció": {
       "main": [
+        [
+          {
+            "node": "Egyenként",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Egyenként": {
+      "main": [
+        [],
         [
           {
             "node": "PDF letöltése",
@@ -374,6 +394,39 @@
         [
           {
             "node": "Jelentés: mentési hiba",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jelentés: kész": {
+      "main": [
+        [
+          {
+            "node": "Egyenként",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jelentés: letöltési hiba": {
+      "main": [
+        [
+          {
+            "node": "Egyenként",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jelentés: mentési hiba": {
+      "main": [
+        [
+          {
+            "node": "Egyenként",
             "type": "main",
             "index": 0
           }

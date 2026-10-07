@@ -72,6 +72,9 @@ def _startup_tasks(config_path: str | None) -> None:
             # PDFs already in the folder count as downloaded, and are filed into their journal / issue folder
             storage.reconcile_downloads(scan_pdf_dir(cfg.api.pdf_dir), datetime.now().astimezone())
             organize_all(storage, cfg.api.pdf_dir, cfg.downloads.folders, cfg.downloads.inbox)
+            moved = storage.retry_transient_failures(datetime.now().astimezone())
+            if moved:
+                log.info("megszakadt letöltések: %d most újra letölthető", moved)
         finally:
             storage.close()
     except Exception:

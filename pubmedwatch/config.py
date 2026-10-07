@@ -166,6 +166,7 @@ class DownloadsConfig:
     sections: list[str]  # report sections whose PDFs are downloaded; empty = all
     kinds: list[str]  # article kinds to download (guideline, systematic_review, ...); empty = all
     preprints: bool  # also download the preprint of an article that has no downloadable published version
+    max_retries_per_run: int  # earlier failures offered again in one run, longest-waiting first (0 = no limit)
 
 
 @dataclass
@@ -246,6 +247,7 @@ def load_config(path: str | os.PathLike | None = None) -> Config:
         sections=[str(x) for x in dl.get("sections", [])],
         kinds=[str(x) for x in dl.get("kinds", [])],
         preprints=bool(dl.get("preprints", True)),
+        max_retries_per_run=int(dl.get("max_retries_per_run", 100)),
     )
     for section_id in downloads.sections:
         if section_id not in section_ids:

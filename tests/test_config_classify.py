@@ -67,3 +67,7 @@ def test_section_routing(cfg):
     assert section_of(cfg, "other", ["innovacio", "gyermek-ams"]) == "gyermek-ams"
     assert section_of(cfg, "protocol", ["gyermek-ams", "protokoll"]) == "vizsgalatok"
     assert section_of(cfg, "systematic_review", ["infektologia-iranyelv-review"]) == "review-infektologia"
+
+
+def test_retry_cap_comes_from_the_config(cfg):
+    assert cfg.downloads.max_retries_per_run == 100

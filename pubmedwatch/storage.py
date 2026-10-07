@@ -5,6 +5,7 @@ The API, the report and the n8n webhook all read the same dictionaries (see `art
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -124,6 +125,20 @@ NEW_ARTICLE_COLUMNS = ("volume", "issue", "bibl_checked_at", "author_emails", "o
 DOWNLOAD_COLUMNS = ("pmid", "version", "status", "attempts", "first_attempt_at", "last_attempt_at", "next_retry_at",
                     "last_error", "path", "bytes", "saved_at", "source")
 JSON_TRIAL = ("phases", "countries", "conditions", "interventions")
+
+# A download cut off by the network or a busy server (n8n reports words like these) is tried again at the next daily
+# run, a few times; a refusal (403, "not a PDF", an upstream 4xx our proxy passes on as 502) waits for the monthly retry.
+TRANSIENT_ERROR = re.compile(r"aborted|timeout|timed out|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|"
+                             r"socket hang up|\b(?:429|502|503|504)\b|too many requests|bad gateway|"
+                             r"service unavailable|gateway time", re.I)
+REFUSAL = re.compile(r"(?:^|HTTP )4(?!29)\d\d\b|nem PDF", re.I)
+QUICK_RETRY = timedelta(hours=12)  # whenever the failure happened, this lands before the next 07:00 run
+QUICK_RETRY_ATTEMPTS = 3  # after this many failed attempts only the monthly retry is left
+RETRY_MARGIN = timedelta(hours=3)  # the run N days later starts a little before this attempt was reported
+
+
+def is_transient(error: str) -> bool:
+    return bool(TRANSIENT_ERROR.search(error or "")) and not REFUSAL.search(error or "")
 
 
 def now_iso() -> str:
@@ -366,8 +381,8 @@ class Storage:
     # --- downloads ledger ---------------------------------------------------------------------
     def downloads_due(self, now: datetime, hours: int, retry_for_days: int, path_for,
                       sections: list[str] | None = None, kinds: list[str] | None = None,
-                      preprints: bool = True) -> list[dict]:
-        """What an automated download should be attempted for right now, newest first.
+                      preprints: bool = True, max_retries: int | None = None) -> list[dict]:
+        """What an automated download should be attempted for right now: new ones newest first, then retries.
 
         Published version (vor), from a source a script may fetch:
         - new: never attempted, the PDF appeared (or was found) within `hours`;
@@ -375,6 +390,8 @@ class Storage:
         - relinked: failed earlier, but the PDF link changed since, so it deserves a new try.
         Preprint (only when no downloadable published version exists and it was not downloaded): same rules.
         Anything downloaded once (`ok`) is never offered again. `sections` / `kinds` narrow the choice (empty = all).
+        `max_retries` caps the retries per run, the longest-waiting first (new ones are never capped: they would
+        leave the window, while a retry can wait for the next day).
         `path_for(article, version)` -> {"path", "final_path", "url"}."""
         stamp = lambda dt: dt.isoformat(timespec="seconds")  # noqa: E731
         marks = ",".join("?" * len(AUTO_DOWNLOAD_SOURCES))
@@ -394,6 +411,7 @@ class Storage:
                              f"AND NOT EXISTS (SELECT 1 FROM downloads v WHERE v.pmid=a.pmid AND v.version='vor' "
                              f"AND v.status='ok')", list(AUTO_DOWNLOAD_SOURCES)))
         due: list[dict] = []
+        retries: list[tuple[str, dict]] = []
         for version, has_link, link_args in channels:
             for row in self.db.execute(
                     f"SELECT a.* FROM articles a LEFT JOIN downloads d ON d.pmid=a.pmid AND d.version=? "
@@ -401,20 +419,24 @@ class Storage:
                     f"ORDER BY a.updated_at DESC, a.pmid", (version, *link_args, window, *scope_args)):
                 due.append(self._with_download(row, version, "new", 0, "", path_for))
             for row in self.db.execute(
-                    f"SELECT a.*, d.attempts AS d_attempts, d.last_error AS d_error, "
+                    f"SELECT a.*, d.attempts AS d_attempts, d.last_error AS d_error, d.last_attempt_at AS d_last, "
                     f"(datetime(d.next_retry_at) <= datetime(?)) AS d_monthly FROM downloads d "
                     f"JOIN articles a ON a.pmid=d.pmid WHERE d.version=? AND d.status='failed' AND {has_link} "
                     f"AND datetime(d.first_attempt_at) >= datetime(?) AND (datetime(d.next_retry_at) <= datetime(?) "
                     f"OR datetime(a.updated_at) > datetime(d.last_attempt_at)){scope} ORDER BY a.pmid",
                     (stamp(now), version, *link_args, horizon, stamp(now), *scope_args)):
-                due.append(self._with_download(row, version, "retry" if row["d_monthly"] else "relinked",
-                                               row["d_attempts"], row["d_error"], path_for))
-        return due
+                retries.append((row["d_last"], self._with_download(row, version,
+                                                                   "retry" if row["d_monthly"] else "relinked",
+                                                                   row["d_attempts"], row["d_error"], path_for)))
+        retries.sort(key=lambda r: r[0])
+        if max_retries is not None:
+            retries = retries[:max_retries]
+        return due + [article for _, article in retries]
 
     def _with_download(self, row: sqlite3.Row, version: str, reason: str, attempts: int, last_error: str,
                        path_for) -> dict:
         article = self.article_dict(row)
-        for extra in ("d_attempts", "d_error", "d_monthly"):
+        for extra in ("d_attempts", "d_error", "d_monthly", "d_last"):
             article.pop(extra, None)
         article["download"] = {"version": version, "reason": reason, "attempts": attempts, "last_error": last_error,
                                **path_for(article, version)}
@@ -431,7 +453,8 @@ class Storage:
                         size: int | None = None, error: str = "", retry_in_days: int | None = None,
                         version: str = "vor") -> dict:
         """Records the outcome of one attempt. `ok` is final; `failed` schedules the next try: monthly by default
-        (`retry_every_days`), or after `retry_in_days` for local problems such as an unwritable folder."""
+        (`retry_every_days`), after `retry_in_days` for local problems such as an unwritable folder, and at the next
+        daily run for a download the network cut off (at most QUICK_RETRY_ATTEMPTS times)."""
         ts = now.isoformat(timespec="seconds")
         row = self._ledger_row(pmid, version)
         if row is not None and row["status"] == "ok":
@@ -441,12 +464,36 @@ class Storage:
         if status == "ok":
             values.update(status="ok", next_retry_at="", last_error="", path=path, bytes=size, saved_at=ts)
         else:
-            retry_at = (now + timedelta(days=retry_in_days or retry_every_days)).isoformat(timespec="seconds")
-            values.update(status="failed", next_retry_at=retry_at, last_error=error[:300], path="", bytes=None,
-                          saved_at="")
+            if retry_in_days is None and values["attempts"] <= QUICK_RETRY_ATTEMPTS and is_transient(error):
+                retry_at = now + QUICK_RETRY
+            else:
+                retry_at = now + timedelta(days=retry_in_days or retry_every_days) - RETRY_MARGIN
+            values.update(status="failed", next_retry_at=retry_at.isoformat(timespec="seconds"),
+                          last_error=error[:300], path="", bytes=None, saved_at="")
         self._ledger_write(values)
         self.db.commit()
         return dict(self._ledger_row(pmid, version))
+
+    def retry_transient_failures(self, now: datetime) -> int:
+        """Offers the downloads the network cut off (still within their quick retries) again right away: called at
+        start-up, which usually follows fixing whatever cut them off. Returns how many were brought forward."""
+        moved = 0
+        rows = self.db.execute("SELECT pmid, version, next_retry_at, last_error FROM downloads "
+                               "WHERE status='failed' AND attempts<=?", (QUICK_RETRY_ATTEMPTS,)).fetchall()
+        for row in rows:
+            if not is_transient(row["last_error"]):
+                continue
+            try:
+                waiting = not row["next_retry_at"] or datetime.fromisoformat(row["next_retry_at"]) > now
+            except (TypeError, ValueError):  # a hand-edited or naive timestamp: leave the row alone
+                continue
+            if waiting:
+                self.db.execute("UPDATE downloads SET next_retry_at=? WHERE pmid=? AND version=?",
+                                (now.isoformat(timespec="seconds"), row["pmid"], row["version"]))
+                moved += 1
+        if moved:
+            self.db.commit()
+        return moved
 
     def reconcile_downloads(self, files: Iterable[tuple[str, str, str, int, str]], now: datetime) -> int:
         """Marks articles `ok` whose PDF is already in the PDF folder: (pmid, version, path, size, modified) as found

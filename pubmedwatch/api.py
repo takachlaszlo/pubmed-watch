@@ -140,7 +140,8 @@ def handle(cfg: Config, storage: Storage, path: str, params: dict[str, str]) -> 
         dl = cfg.downloads
         return ok(storage.downloads_due(now, hours, dl.retry_for_days,
                                         lambda article, version: download_paths(cfg, article, version),
-                                        sections=dl.sections, kinds=dl.kinds, preprints=dl.preprints))
+                                        sections=dl.sections, kinds=dl.kinds, preprints=dl.preprints,
+                                        max_retries=dl.max_retries_per_run or None))
     if parts == ["downloads"]:
         return ok(storage.downloads(params.get("status"), limit or 100, offset or 0))
     if parts == ["reports", "latest"]:
@@ -209,7 +210,8 @@ def make_server(cfg: Config, host: str = "0.0.0.0", http=None) -> ThreadingHTTPS
                 raise ApiError(404, "nincs ilyen cikk")
             url, headers = upstream_for(cfg, article)
             try:
-                resp = http.stream(url, headers=headers)
+                # one try only: n8n waits at most two minutes, and a failed try comes back at the next daily run
+                resp = http.stream(url, headers=headers, attempts=1)
             except Exception as exc:
                 raise ApiError(502, f"a forrás nem adta ki a PDF-et: {redact(exc)}")
             try:
